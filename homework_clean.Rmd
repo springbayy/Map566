@@ -1,0 +1,243 @@
+---
+title: "MAP566 - Homework assignment #1"
+format:
+  html:
+    self-contained: true
+    theme: [cosmo, theme.scss]
+    toc: true
+    number-sections: true
+    html-math-method: katex
+    code-copy: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+---
+
+# Single comparison
+
+```{r,warning=FALSE}
+library(readr)
+library(dplyr)
+library(tidyverse)
+
+NHANES <- read_csv("NHANES_age_prediction 3.csv")
+data = NHANES[,c("DIQ010","age_group","RIDAGEYR","RIAGENDR","PAQ605","BMXBMI","LBXGLU","LBXGLT","LBXIN")]
+colnames(data) = c("Diabete","age_group","Age","Sex","Phys_activ","BMI","Glu","Glu2h","BIL")
+```
+
+We study data from the National Health and Nutrition Examination Survey (NHANES), administered by the Centers for Disease Control and Prevention (CDC), which collects extensive health and nutritional information from a diverse U.S. population.
+
+```{r}
+rmarkdown::paged_table(data)
+```
+
+The variables under study are :
+
+-   `Diabete`: diabete diagnosis (1: Yes, 2: No, 3: Borderline);
+-   `age_group` : age group of respondent ("Adult" or "Senior");
+-   `Age` : the age of respondent;
+-   `Sex`: sex of respondent (1: Male, 2: Female);
+-   `Physical activity`: respondent's answer to the question "Does your work involve vigorous-intensity activity that causes large increases in breathing or heart rate like carrying or lifting heavy loads, digging or construction work for at least 10 minutes continuously? (1: Yes, 2: No, 7: no answer);
+-   `BMI` : Body Mass Index if respondent ($kg/m^{2}$);
+-   `Glu` : Respondent's Blood Glucose after fasting ($mg/dL$);
+-   `Glu2h` : Respondent's Two Hours Blood Glucose ($mg/dL$);
+-   `BIL` : Respondent's Blood Insulin Level ($pmol/L$).
+
+1.  Test if the mean level of blood glucose after fasting is the same for diabetic and non diabetic respondents (*hint:* plot first the data and justify the test(s) to use).
+
+    To investigate if the mean level of blood glucose after fasting is the same for diabetic and non-diabetic we should first split the data and plot the distributions side by side to get an idea for which test will be the most appropriate.
+
+    ```{r}
+    diabetic <- data %>% filter(Diabete == 1)
+    non_diabetic <- data %>% filter(Diabete == 2)
+
+    rmarkdown::paged_table(diabetic)
+    rmarkdown::paged_table(non_diabetic)
+    ```
+
+    ```{r}
+    diabetic$Group <- "Diabetic"
+    non_diabetic$Group <- "Non-Diabetic"
+
+    combined_data <- rbind(diabetic, non_diabetic)
+
+    ggplot(combined_data, aes(x = Group, y = Glu)) +
+      geom_boxplot() +
+      labs(x = "Status", y = "Glucose") +
+      ggtitle("Glucose Distribution by Diabetes Status") +
+      theme_minimal()
+
+    ggplot(combined_data, aes(x = Group, y = Glu, fill = Group)) +
+      geom_violin(trim = FALSE) +
+      labs(x = "Status", y = "Glucose") +
+      ggtitle("Glucose Distribution by Diabetes Status") +
+      theme_minimal()
+    ```
+
+    It is clear that the glucose distribution after fasting for the two groups have vastly different variances, thus a two-sample t-test would not be applicable due to its equal variance assumption. Further, it appears that the two distributions follow somewhat the normal assumption. **However, we do observe that the diabetic distribution has an elongated tail towards higher glucose levels which could be breaking this assumption.**
+
+    [**TODO :: Double check that indeed the diabetic distribution follows the normal assumption**]{.underline}
+
+    ```{r}
+    var.test(diabetic$Glu, non_diabetic$Glu, var.equal=TRUE)
+    ```
+
+    Further, it is now clear that indeed the variances are not the same for the two distributions given that we can clearly reject the null hypothesis stating that the two variances are the same.
+
+    We will thus be using a Welch two sample t-test to examine whether or not the means of the two groups are the same given that this test does not assume equal variance.
+
+    [**TODO :: Add the setup for the null hypothesis**]{.underline}
+
+    ```{r}
+    t.test(diabetic$Glu, non_diabetic$Glu)
+    ```
+
+    [**TODO :: Write conclusion about the results observed**]{.underline}
+
+2.  Test for the diabetic respondents if the mean level of blood glucose after fasting is the same for adults and seniors.
+
+    Again we need to investigate the distribution for the two groups to understand which assumptions for the different hypothesis tests will be applicable.
+
+    ```{r}
+    diabetic_adult <- data %>% filter(Diabete == 1 & age_group == "Adult")
+    diabetic_seniors <- data %>% filter(Diabete == 1 & age_group == "Senior")
+
+    rmarkdown::paged_table(diabetic_adult)
+    rmarkdown::paged_table(diabetic_seniors)
+    ```
+
+    ```{r}
+    diabetic_adult$Group <- "Diabetic Adult"
+    diabetic_seniors$Group <- "Diabetic Senior"
+
+    combined_data <- rbind(diabetic_adult, diabetic_seniors)
+
+    ggplot(combined_data, aes(x = Group, y = Glu)) +
+      geom_boxplot() +
+      labs(x = "Age Group", y = "Glucose") +
+      ggtitle("Glucose Distribution for Diabetics by Age Group") +
+      theme_minimal()
+
+    ggplot(combined_data, aes(x = Group, y = Glu, fill = Group)) +
+      geom_violin(trim = FALSE) +
+      labs(x = "Age Group", y = "Glucose") +
+      ggtitle("Glucose Distribution for Diabetics by Age Group") +
+      theme_minimal()
+    ```
+
+    From this we can observe that the distribution for the diabetic adults and diabetic seniors do not have the same variance and that they do not follow the normal assumption. Which is clear by the fact that for seniors we have two distinct peaks, and for adults we have a trailing tail for higher glucose levels which indicate that they do not follow the parametric Gaussian distribution. Making the two sample Welch t-test not applicable in this scenario. Thus, to circumvent these limiting assumptions in this case we will be performing a Wilcoxon test which does not have an underlying parametric assumption about the distribution of the data.
+
+    [**TODO :: Add the maths behind to frame the problem first**]{.underline}
+
+    ```{r}
+    wilcox.test(diabetic_adult$Glu, diabetic_seniors$Glu, alternative="two.sided")
+    ```
+
+    [**TODO :: Add conclusion about the results of the test**]{.underline}
+
+3.  Is it possible to test for the adults diabetic respondents if the mean level of blood glucose after fasting is the same for those who have a vigorous work activity and for those who have not?
+
+    [**TODO :: Write motivation for the test**]{.underline}
+
+    ```{r}
+    diabetic_active <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 1)
+    diabetic_inactive <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 2)
+
+    diabetic_active$Group <- "Diabetic Active"
+    diabetic_inactive$Group <- "Diabetic Inactive"
+
+    # Combine the data frames
+    combined_data <- rbind(diabetic_active, diabetic_inactive)
+
+    # Create boxplot
+    ggplot(combined_data, aes(x = Group, y = Glu)) +
+      geom_boxplot() +
+      labs(x = "Work Activity", y = "Glucose") +
+      ggtitle("Glucose Distribution for Diabetic Adults by Work Activity") +
+      theme_minimal()
+
+    # Create violin plot
+    ggplot(combined_data, aes(x = Group, y = Glu, fill = Group)) +
+      geom_violin(trim = FALSE) +
+      labs(x = "Work Activity", y = "Glucose") +
+      ggtitle("Glucose Distribution for Diabetic Adults by Work Activity") +
+      theme_minimal()
+    ```
+
+    ```{r}
+    wilcox.test(diabetic_active$Glu, diabetic_inactive$Glu, alternative="two.sided")
+    ```
+
+    [**TODO :: Add conclusion and analysis about the results**]{.underline}
+
+4.  Test if the proportion of diabetic is the same for male and female respondents. Compare conclusions of several tests. You can use the function `table` to compute contingency tables.
+
+    ```{r}
+    # Create a contingency table
+    contingency_table <- table(data$Diabete, data$Sex)
+    rownames(contingency_table) <- c("No Diabetes", "Diabetes", "Borderline")
+    colnames(contingency_table) <- c("Male", "Female")
+
+    # Display the contingency table
+    contingency_table
+
+    # Perform chi-square test
+    chi_square_test <- chisq.test(contingency_table)
+
+    # Display the results
+    chi_square_test
+    ```
+
+# Gene expression data
+
+The *liver* dataset contains measurements of rat liver toxicity levels (measured through cholesterol levels) as well as measurements of the expression levels of several thousand genes.
+
+When loading the data (file `liver_data.rda`), the table *liver* is created with 64 rows (the observations) and 3117 columns. The data can be loaded using the following code:
+
+```{r}
+load("liver_data.rda")
+```
+
+The first column, `cholesterol`, is the variable to be explained. The remaining 3116 are the expressions of 3116 genes (more precisely, the logarithm of the ratio between expression levels in two experimental conditions). The aim is to identify the variables (and therefore the genes) linked to the response.
+
+1.  We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot `cholesterol` as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and `cholesterol`?
+
+2.  We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains `cholesterol` as a function of the gene expression and compute the $p$-value of the test.
+
+3.  Order the $p$-values and plot the ordered $p$-values as a function of their rank. On the same plot, display the line $y = x/3116$. Discuss the result.
+
+4.  Identify a set of genes linked to the response (*aka* discoveries). We want to guarantee that the expected proportion of false discoveries (mistakes) is less than $5\%$. Explain how you proceed and how many genes you discover.
+
+5.  We wish to be more conservative and guarantee that the probability of making a false discovery (or more) is less than $5\%$. Explain how you proceed and how many genes you discover.
+
+# Non parametric regression
+
+1.  Upload the dataset contained in the file `data_exo3.csv` and plot the data.
+
+2.  Try several polynomial models for the data, select a model and comment the results.
+
+3.  Fit a nonlinear model and compare with the polynomial model you have selected.
+
+4.  Calculate confidence intervals for $\mathbb{E}(Y_{new})$ and prediction intervals for $Y_{new}$ on the following values of the covariate: $$
+    x_{new} = (1,...,10). 
+    $$
+
+# S&P500 daily return
+
+The Standard and Poor's 500 or simply the S&P 500, is a stock market index tracking the performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices.
+
+The dataset `sp500_history.csv` contains information about the value of the index at the opening and closing of the market, every day from January 3rd, 2007 to February 2nd, 2024. The goal of the study is to understand the distribution of the *Daily Return* during this period. The daily return is defined as the index difference between closing and opening.
+
+1.  Load the dataset `sp500_history.csv` into a *data frame* and add a column that computes the daily return for each days.
+
+2.  We propose to model the daily return as a sample from a normal population. Write the model and use *R* to fit it to the data. What do you think of this model?
+
+3.  Instead of a single normal, we now propose to use a mixture of normals with $p$ components. Write the corresponding models and use *R* to fit them to the data for all values of $p$ between $2$ and $6$. Discuss the results and compare them with the model of Question 1.
+
+4.  As a third and last model, we propose to model the daily return as coming from a location-scale family of Student distributions, which is a model defined by the collection of densities $$f_{\nu,m,a}(x) = \frac{\Gamma\big(\frac{\nu+1}{2}\big)}{\sqrt{\pi \nu a^2}\Gamma\big(\frac{\nu}{2}\big)}\Bigg(1+\frac{(x-m)^2}{\nu a^2} \Bigg)^{-\frac{\nu+1}{2}}$$ where $\Gamma$ is the Gamma function and $\theta=(\nu,m,a) \in \mathbb{R}_+^*\times \mathbb{R}\times \mathbb{R}_+^*$ is the parameter.
+
+    1.  What is the motivation for considering this model?
+    2.  Propose an algorithm for estimating the parameter of this model and use it to fit this model to the data.
+
+5.  Between all the previous models (the normal, the 5 mixtures of normals, and the location-scale Student) which one do you choose? Explain your methodology.
+
+6.  Is the expected daily return different than zero?
