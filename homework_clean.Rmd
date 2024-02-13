@@ -18,6 +18,7 @@ format:
 library(readr)
 library(dplyr)
 library(tidyverse)
+library(MASS)
 
 NHANES <- read_csv("NHANES_age_prediction 3.csv")
 data = NHANES[,c("DIQ010","age_group","RIDAGEYR","RIAGENDR","PAQ605","BMXBMI","LBXGLU","LBXGLT","LBXIN")]
@@ -229,7 +230,42 @@ The dataset `sp500_history.csv` contains information about the value of the inde
 
 1.  Load the dataset `sp500_history.csv` into a *data frame* and add a column that computes the daily return for each days.
 
+    ```{r}
+    sp500_data <- read_csv("sp500_history.csv")
+    rmarkdown::paged_table(sp500_data)
+    ```
+
+    ```{r}
+    sp500_data$DailyReturn <- sp500_data$Close - sp500_data$Open
+    rmarkdown::paged_table(sp500_data)
+    ```
+
 2.  We propose to model the daily return as a sample from a normal population. Write the model and use *R* to fit it to the data. What do you think of this model?
+
+    ```{r}
+    ggplot(sp500_data, aes(x = Date, y = DailyReturn)) +
+      geom_histogram(stat = "identity", fill = "skyblue", color = "black", bins = 15) +
+      labs(title = "Daily Return of S&P 500 (2007-2010)",
+           x = "Date",
+           y = "Daily Return") +
+      theme_minimal() +
+      theme(axis.text.x = element_blank(),
+            axis.title.x = element_blank())
+    ```
+
+    ```{r}
+    fit <- fitdistr(sp500_data$DailyReturn, "normal")
+
+    # Print the fitted parameters
+    print(fit)
+
+    # Plot the histogram of daily returns with the fitted Gaussian distribution
+    hist(sp500_data$DailyReturn, breaks = 30, freq = FALSE, 
+         main = "Histogram of Daily Returns with Fitted Gaussian Distribution",
+         xlab = "Daily Return")
+    curve(dnorm(x, mean = fit$estimate[1], sd = fit$estimate[2]), 
+          col = "blue", lwd = 2, add = TRUE, yaxt = "n")
+    ```
 
 3.  Instead of a single normal, we now propose to use a mixture of normals with $p$ components. Write the corresponding models and use *R* to fit them to the data for all values of $p$ between $2$ and $6$. Discuss the results and compare them with the model of Question 1.
 
