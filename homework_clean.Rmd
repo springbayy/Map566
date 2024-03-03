@@ -139,6 +139,18 @@ The variables under study are :
 3.  Is it possible to test for the adults diabetic respondents if the mean level of blood glucose after fasting is the same for those who have a vigorous work activity and for those who have not?
 
     [**TODO :: Write motivation for the test**]{.underline}
+    TODO :: Apply power of t-test such that we can examine if we can test this
+```{r}
+diabetic_active <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 1)
+diabetic_inactive <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 2)
+
+diabetic_active$Group <- "Diabetic Active"
+diabetic_inactive$Group <- "Diabetic Inactive"
+
+# Combine the data frames
+combined_data <- rbind(diabetic_active, diabetic_inactive)
+combined_data
+```
 
     ```{r}
     diabetic_active <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 1)
@@ -172,6 +184,8 @@ The variables under study are :
     [**TODO :: Add conclusion and analysis about the results**]{.underline}
 
 4.  Test if the proportion of diabetic is the same for male and female respondents. Compare conclusions of several tests. You can use the function `table` to compute contingency tables.
+
+TODO :: Compare several tests
 
     ```{r}
     # Create a contingency table
@@ -232,23 +246,23 @@ The dataset `sp500_history.csv` contains information about the value of the inde
 1.  Load the dataset `sp500_history.csv` into a *data frame* and add a column that computes the daily return for each days.
 
     ```{r}
-sp500_data <- read_csv("sp500_history.csv")
-sp500_data$DailyReturn <- sp500_data$Close - sp500_data$Open
+    sp500_data <- read_csv("sp500_history.csv")
+    sp500_data$DailyReturn <- sp500_data$Close - sp500_data$Open
 
-# Check for non-numeric values in DailyReturn column
-non_numeric_count <- sum(is.na(sp500_data$DailyReturn) | !is.numeric(sp500_data$DailyReturn))
+    # Check for non-numeric values in DailyReturn column
+    non_numeric_count <- sum(is.na(sp500_data$DailyReturn) | !is.numeric(sp500_data$DailyReturn))
 
-# Print the count of non-numeric values
-cat("Number of non-numeric values in DailyReturn column:", non_numeric_count, "\n")
+    # Print the count of non-numeric values
+    cat("Number of non-numeric values in DailyReturn column:", non_numeric_count, "\n")
 
-# If there are non-numeric values, print their indices
-if (non_numeric_count > 0) {
-  cat("Indices of non-numeric values in DailyReturn column:", which(!is.numeric(sp500_data$DailyReturn)), "\n")
-} else {
-  cat("No non-numeric values found in DailyReturn column.\n")
-}
+    # If there are non-numeric values, print their indices
+    if (non_numeric_count > 0) {
+      cat("Indices of non-numeric values in DailyReturn column:", which(!is.numeric(sp500_data$DailyReturn)), "\n")
+    } else {
+      cat("No non-numeric values found in DailyReturn column.\n")
+    }
 
-rmarkdown::paged_table(sp500_data)
+    rmarkdown::paged_table(sp500_data)
     ```
 
 2.  We propose to model the daily return as a sample from a normal population. Write the model and use *R* to fit it to the data. What do you think of this model?
@@ -353,7 +367,7 @@ rmarkdown::paged_table(sp500_data)
       result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
       
       result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
-  
+      
       # Plot histogram with 50 bars
       hist(y, breaks = 50, probability = TRUE, col = alpha("skyblue", 0.25), border = alpha("black", 0.25), main = paste("Mixture Model with", n_components, "Components"), xlab = "Daily Return", ylab = "Density")
       
@@ -381,7 +395,8 @@ rmarkdown::paged_table(sp500_data)
 
     mixtures = c(mx2, mx3, mx4, mx5, mx6)
     ```
-We can observe that the final fits are indeed much better than the single Gaussian example. However, we do observe that there is some overfitting happening at the tails of the distribution for all of the experiments we have run. This is caused by the fact that the means are not the same for all the Gaussian components and thus for our next section we will be looking at constrained optimization of this GMM where the means should be the same.
+
+    We can observe that the final fits are indeed much better than the single Gaussian example. However, we do observe that there is some overfitting happening at the tails of the distribution for all of the experiments we have run. This is caused by the fact that the means are not the same for all the Gaussian components and thus for our next section we will be looking at constrained optimization of this GMM where the means should be the same.
 
 ## Constrained GMM Optimisation
 
@@ -416,7 +431,6 @@ M_step_same_means <- function(tau, x) {
 }
 
 ```
-
 
 ```{r}
 
@@ -462,6 +476,7 @@ theta0  <- list(pi=pi, mu=means, sigma=variances)
 out_general <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_same_means)
 out_general$theta
 ```
+
 ```{r}
 softmax <- function(x) {
   exp_x <- exp(x)
@@ -507,12 +522,12 @@ constrained_gmm_experiment <- function(y, variances) {
 ```
 
 ```{r}
-constrained_gmm_experiment(y, variances = c(10, 5, 7))
+constrained_gmm_experiment(y, variances = c(10, 5))
 ```
 
-
-    **TODO :: Compare each using BIC**
-
+```         
+**TODO :: Compare each using BIC**
+```
 
 4.  As a third and last model, we propose to model the daily return as coming from a location-scale family of Student distributions, which is a model defined by the collection of densities $$f_{\nu,m,a}(x) = \frac{\Gamma\big(\frac{\nu+1}{2}\big)}{\sqrt{\pi \nu a^2}\Gamma\big(\frac{\nu}{2}\big)}\Bigg(1+\frac{(x-m)^2}{\nu a^2} \Bigg)^{-\frac{\nu+1}{2}}$$ where $\Gamma$ is the Gamma function and $\theta=(\nu,m,a) \in \mathbb{R}_+^*\times \mathbb{R}\times \mathbb{R}_+^*$ is the parameter.
 

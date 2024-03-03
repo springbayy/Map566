@@ -4,26 +4,531 @@ output: html_document
 date: "2024-03-02"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r,warning=FALSE}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(MASS)
+library(mixtools)
 ```
 
-# Single comparison
+# Statistics in Action - Homework
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+**Group:** Max Rehman Linder, Patrick Tourniaire & Antonio Nisi
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## 1. Single comparison
 
-```{r cars}
-summary(cars)
+```{r}
+# Import dataset
+
+NHANES <- read_csv("NHANES_age_prediction 3.csv")
+data = NHANES[,c("DIQ010","age_group","RIDAGEYR","RIAGENDR","PAQ605","BMXBMI","LBXGLU","LBXGLT","LBXIN")]
+colnames(data) = c("Diabete","age_group","Age","Sex","Phys_activ","BMI","Glu","Glu2h","BIL")
+
+rmarkdown::paged_table(data)
 ```
 
-## Including Plots
+Feature descriptions for the above dataset:
 
-You can also embed plots, for example:
+-   `Diabete`: diabete diagnosis (1: Yes, 2: No, 3: Borderline)
+-   `age_group` : age group of respondent ("Adult" or "Senior")
+-   `Age` : the age of respondent
+-   `Sex`: sex of respondent (1: Male, 2: Female)
+-   `Physical activity`: respondent's answer to the question "Does your work involve vigorous-intensity activity that causes large increases in breathing or heart rate like carrying or lifting heavy loads, digging or construction work for at least 10 minutes continuously? (1: Yes, 2: No, 7: no answer)
+-   `BMI` : Body Mass Index if respondent ($kg/m^{2}$)
+-   `Glu` : Respondent's Blood Glucose after fasting ($mg/dL$)
+-   `Glu2h` : Respondent's Two Hours Blood Glucose ($mg/dL$)
+-   `BIL` : Respondent's Blood Insulin Level ($pmol/L$).
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+### 1.1 Mean level of blood glucose after fasting
+
+**Task description:** Test if the mean level of blood glucose after fasting is the same for diabetic and non diabetic respondents (*hint:* plot first the data and justify the test(s) to use).
+
+Before starting to compare the two groups of diabetics and non-diabetics we first split the dataset by filtering for the two cases.
+
+```{r}
+diabetic <- data %>% filter(Diabete == 1)
+non_diabetic <- data %>% filter(Diabete == 2)
+
+rmarkdown::paged_table(diabetic)
+rmarkdown::paged_table(non_diabetic)
+
+# Create a new combined table with only these two groups
+diabetic$Group <- "Diabetic"
+non_diabetic$Group <- "Non-Diabetic"
+
+combined_data <- rbind(diabetic, non_diabetic)
+combined_data
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+To be able to accurately test the mean blood glucose level for the two groups we have to plot the distribution of this data. This will allow us to identify the most applicable test as each hypothesis test have underlying assumptions which the data should be roughly following to achieve an accurate result through our tests.
+
+To achieve this we create a box plot and a violin plot to understand the mean and variance of the data and to see how the data is distributed differently for the two groups through a violin plot.
+
+```{r}
+ggplot(combined_data, aes(x = Group, y = Glu)) +
+  geom_boxplot() +
+  labs(x = "Status", y = "Glucose") +
+  ggtitle("Glucose Distribution by Diabetes Status") +
+  theme_minimal()
+
+ggplot(combined_data, aes(x = Group, y = Glu, fill = Group)) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Status", y = "Glucose") +
+  ggtitle("Glucose Distribution by Diabetes Status") +
+  theme_minimal()
+```
+
+It is clear that the glucose distribution after fasting for the two groups have vastly different variances, thus a two-sample t-test would not be applicable due to its equal variance assumption. Further, it appears that the two distributions follow somewhat the parametric assumption. As a sanity check we can setup a test of the to distributions to verify that the variances should not be equal.
+
+To achieve this we can perform an F-test which will test whether the variances of the two groups are equal. Thus, we will have the following hypotheses (where $d$ represents the diabetics and $\bar{d}$ represents the non-diabetics):
+
+$$
+\begin{align}
+  H_0 &: \sigma_{d} = \sigma_{\bar{d}} \\
+  H_1 &:\sigma_{d} \neq \sigma_{\bar{d}} \hspace{5mm} \text{for a two-tailed F-test}
+\end{align}
+$$
+
+Since, we are only interested to see if the variances are unequal or not we use the two-tailed alternative hypothesis for the F-test.
+
+```{r}
+var.test(diabetic$Glu, non_diabetic$Glu, alternative = "two.sided")
+```
+
+Indeed, we can report a p-value of 2.2e-16 thus, we can reject the null hypothesis and conclude that the variances are indeed different. Which leads us to using the Welch student t-test which assumes parametric distribution with two groups of different variances. Again we use the same two sided alternative hypothesis but now for the means.
+
+$$
+\begin{align}
+H_0 &: \mu_{d} = \mu_{\bar{d}} \\
+H_1 &: \mu_{d} \neq \mu_{\bar{d}}
+\end{align}
+$$
+
+With the following piece of code we can perform this Welch t-test on the means.
+
+```{r}
+t.test(diabetic$Glu, non_diabetic$Glu, alternative="two.sided")
+```
+
+Given that $\alpha = 0.05$ we can reject the null-hypothesis and say that our results of this test is significant and shows that we do not have enough evidence to conclude that the means between the two groups are indeed the same.
+
+### 1.2 Diabetic mean blood glucose level between adults and seniors
+
+**Task description:** Test for the diabetic respondents if the mean level of blood glucose after fasting is the same for adults and seniors.
+
+To analyse what test will be the most applicable we will first plot the distributions, but to do that we will first need to create these two groups from our dataset.
+
+```{r}
+diabetic_adult <- data %>% filter(Diabete == 1 & age_group == "Adult")
+diabetic_seniors <- data %>% filter(Diabete == 1 & age_group == "Senior")
+
+rmarkdown::paged_table(diabetic_adult)
+rmarkdown::paged_table(diabetic_seniors)
+
+diabetic_adult$Group <- "Diabetic Adult"
+diabetic_seniors$Group <- "Diabetic Senior"
+
+combined_data <- rbind(diabetic_adult, diabetic_seniors)
+rmarkdown::paged_table(combined_data)
+```
+
+We then use the new combined dataframe consisting only of these two groups to plot the distributions.
+
+```{r}
+ggplot(combined_data, aes(x = Group, y = Glu)) +
+  geom_boxplot() +
+  labs(x = "Age Group", y = "Glucose") +
+  ggtitle("Glucose Distribution for Diabetics by Age Group") +
+  theme_minimal()
+
+ggplot(combined_data, aes(x = Group, y = Glu, fill = Group)) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Age Group", y = "Glucose") +
+  ggtitle("Glucose Distribution for Diabetics by Age Group") +
+  theme_minimal()
+```
+
+From this we can observe that the distribution for the diabetic adults and diabetic seniors do not have the same variance and that they do not follow the parametric assumption. Which is clear by the fact that for seniors we have two distinct peaks which indicate that they do not follow the parametric distribution. Making the two sample Welch t-test not applicable in this scenario. Thus, to circumvent these limiting assumptions in this case we will be performing a Wilcoxon test which does not have an underlying parametric assumption about the distribution of the data.
+
+Given the task description we can setup the following hypothesis test. Where $a$ represents the adult group and $s$ represents the senior group.
+
+$$
+\begin{align}
+H_0 &: \mu_{a} = \mu_{s} \\
+H_1 &: \mu_{a} \neq \mu_{s}
+\end{align}
+$$
+
+Thus, we can perform the following Wilcox test to test this hypothesis.
+
+```{r}
+wilcox.test(diabetic_adult$Glu, diabetic_seniors$Glu, alternative="two.sided")
+```
+
+**TODO :: Figure out this error...**
+
+### 1.3 Vigorous work activity mean blood glucose for adult diabetics
+
+**Task description:** Is it possible to test for the adults diabetic respondents if the mean level of blood glucose after fasting is the same for those who have a vigorous work activity and for those who have not?
+
+Again we will first filter the dataset and create a new combined dataset for these two groups.
+
+```{r}
+diabetic_active <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 1)
+diabetic_inactive <- data %>% filter(Diabete == 1 & age_group == "Adult" & Phys_activ == 2)
+
+diabetic_active$Group <- "Diabetic Active"
+diabetic_inactive$Group <- "Diabetic Inactive"
+
+rmarkdown::paged_table(diabetic_active)
+rmarkdown::paged_table(diabetic_inactive)
+
+# Combine the data frames
+combined_data <- rbind(diabetic_active, diabetic_inactive)
+rmarkdown::paged_table(combined_data)
+```
+
+Immediately we can observe that we have significantly less data than for the other exercises, which can indicate that test results can be inconclusive.
+
+### 1.4 Same proportion of male and female diabetics
+
+**Task description:** Test if the proportion of diabetic is the same for male and female respondents. Compare conclusions of several tests. You can use the function `table` to compute contingency tables.
+
+## 2. Gene expression data
+
+## 3. Non parametric regression
+
+## 4. S&P500 daily return
+
+### 4.1 Data loading and computing daily return
+
+**Task description:** Load the dataset `sp500_history.csv` into a *data frame* and add a column that computes the daily return for each days.
+
+```{r}
+sp500_data <- read_csv("sp500_history.csv")
+sp500_data$DailyReturn <- sp500_data$Close - sp500_data$Open
+
+# Check for non-numeric values in DailyReturn column
+non_numeric_count <- sum(is.na(sp500_data$DailyReturn) | !is.numeric(sp500_data$DailyReturn))
+cat("Number of non-numeric values in DailyReturn column:", non_numeric_count, "\n")
+
+if (non_numeric_count > 0) {
+  cat("Indices of non-numeric values in DailyReturn column:", which(!is.numeric(sp500_data$DailyReturn)), "\n")
+} else {
+  cat("No non-numeric values found in DailyReturn column.\n")
+}
+
+rmarkdown::paged_table(sp500_data)
+```
+
+### 4.2 Daily return sampled from a normal distribution
+
+**Task description:** We propose to model the daily return as a sample from a normal population. Write the model and use *R* to fit it to the data. What do you think of this model?
+
+To first understand the data, we plot the daily return as a function of the day number.
+
+```{r}
+ggplot(sp500_data, aes(x = Date, y = DailyReturn)) +
+geom_histogram(stat = "identity", fill = "grey", color = "grey", bins = 15) +
+labs(title = "Daily Return of S&P 500 (2007-2010)",
+     x = "Date",
+     y = "Daily Return") +
+theme_minimal() +
+theme(axis.text.x = element_blank(),
+      axis.title.x = element_blank())
+```
+
+Under Louis Bachelier's "Theory of Speculation" assume that the returns can be sampled from a perfectly random distribution, in this case this would be a normal distribution which we can parametirise through a Gaussian model. Assume that the return is modeled by some random variable $X_r$ and that some value of that RV is denoted by $x_t$. Thus, since we first assume Bachelier's theory we can model the RV through the following Gaussian.
+
+$$    X_r \sim \mathcal{N}(\mu_r, \sigma_r^2)    $$ Where the model parameters are the empirical mean and empirical variance expressed by: $$    \mu_r = \dfrac{\sum_{i=0}^N x_i}{N} \hspace{5mm} \sigma_r^2 = \dfrac{\sum_{i=0}^N (x_i - \mu_r)}{N}    $$ We can then directly fit such a Gaussian model in R through the following:
+
+```{r}
+fit <- fitdistr(sp500_data$DailyReturn, "normal")
+fit
+
+# Plot the histogram of daily returns with the fitted Gaussian distribution
+hist(sp500_data$DailyReturn, breaks = 100, freq = FALSE, 
+     main = "Daily Returns with Fitted Gaussian Distribution",
+     xlab = "Daily Return")
+curve(dnorm(x, mean = fit$estimate[1], sd = fit$estimate[2]), 
+      col = "blue", lwd = 2, add = TRUE, yaxt = "n")
+```
+
+Indeed, the it seems that Bachelier's theory does describe the price movements well. As the daily return resembles a normal distribution, however, we do observe that that tails seem to follow a higher variance compared to the density around the mean which seems to have a smaller variance. Which also explains why our initial Gaussian doesn't effectively capture this density. Thus, we can motivate why a Gaussian mixture model might perform better in this scenario.
+
+### 4.3 Gaussian Mixture Model
+
+**Task description:** Instead of a single normal, we now propose to use a mixture of normals with $p$ components. Write the corresponding models and use *R* to fit them to the data for all values of $p$ between $2$ and $6$. Discuss the results and compare them with the model of Question 1.
+
+To combine the multiple Gaussians to model a single valid PDF, we will have to introduce a weight parameter which will be used between the weighted sum of Gaussian components. First, we denote a single component the following way. $$    Y_r \sim \mathcal{N}(\theta_k) \hspace{5mm} \text{Where $\theta$ is a parameter vector for component $k$ defined by} \hspace{5mm} \theta_k = \left[ \mu_k, \sigma_k^2 \right]    $$ Furthermore, to form the mixture we introduce the weight parameter $\pi_k$ which is probabilistic and forms the weighted sum (GMM). $$    Y_i = \sum_{k=1}^K \pi_k \mathcal{N}(\theta_k)    $$ As this is a weighted sum and we expect $Y_i$ to be modeled from a valid PDF, we have to constrain the weights such that: $$    \pi_k \geq 0 \hspace{2.5mm} \land \hspace{2.5mm} \sum_{k=1}^K \pi_k = 1    $$ Which is the case as long as we follow that $\pi_k$ comes from a PDF defined over the categorical RVs $Z_i$ which defines the different components such that we have: $$    P(Z_i = k) = \pi_k \hspace{5mm} \text{Where $Z$ is a sequence of RVs} \hspace{5mm} \{1, 2, \dots, K\}    $$ Thus, we observe that we first have to initialize the parameters of the model which we can do by placing the means based on a K-Means initialization and set some explicit variance which will serve as the initialization for the iterative EM-algorithm for parameter optimization over such a GMM. First off, we will naively apply a GMM routine to this problem using expectation maximization which we will compare against an constrained optimization approach where we ensure equal means for all distributions as it seems to only be the variance that's needed to change based on our earlier graph.
+
+#### 4.3.1 Unconstrained EM Optimization of GMMs
+
+For this set of experiments we will be using the general GMM approach outlines above, where we initialize the means using k-Means and perform EM to optimize the model parameters.
+
+```{r}
+n_components = 3
+y = sp500_data$DailyReturn
+
+kmeans_out <- kmeans(y, centers = n_components)
+mu = as.vector(kmeans_out$centers)
+mu
+```
+
+This results seems strange given that we should want Gaussian components around the same mean. However, for this experiment we will naively apply k-Means initialization without any constraints in the optimization and observe what results we obtain.
+
+```{r}
+# Function which fits n gaussian components and plots the components with the final mixture density.
+fit_mixture_model <- function(n_components, y, max_iter = 400) {
+  kmeans_out <- kmeans(y, centers = n_components)
+  mu <- as.vector(kmeans_out$centers)
+  mixture_EM <- normalmixEM(y, mu = mu, k = n_components, arbvar = FALSE, maxit = max_iter)
+  
+  log_likelihood <- mixture_EM$loglik
+  print(log_likelihood)
+  result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
+  
+  result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
+  
+  # Plot histogram with 50 bars
+  hist(y, breaks = 50, probability = TRUE, col = alpha("skyblue", 0.25), border = alpha("black", 0.25), main = paste("Mixture Model with", n_components, "Components"), xlab = "Daily Return", ylab = "Density")
+  
+  # Add density line
+  lines(density(mixture_EM$x), col="red", lwd=2)
+  
+  # Plot densities of Gaussian components
+  x <- seq(min(y), max(y), length.out = 1000)
+  for (i in 1:n_components) {
+    curve(result$pi[i] * dnorm(x, mean = result$mu[i], sd = result$sigma[i]), add = TRUE, col = i + 1, lwd=2, lty=2)
+  }
+  
+  return(list(result = result, mixture_EM = mixture_EM, log_likelihood = log_likelihood))
+}
+```
+
+Using the above function, we can plot the resulting fits for $2$ to $6$ Gaussian components.
+
+```{r}
+mx2 <- fit_mixture_model(2, y)
+mx3 <- fit_mixture_model(3, y)
+mx4 <- fit_mixture_model(4, y)
+mx5 <- fit_mixture_model(5, y)
+mx6 <- fit_mixture_model(6, y)
+
+mixtures = c(mx2, mx3, mx4, mx5, mx6)
+```
+
+We can observe that the final fits are indeed much better than the single Gaussian example. However, we do observe that there is some overfitting happening at the tails of the distribution for all of the experiments we have run. This is caused by the fact that the means are not the same for all the Gaussian components and thus for our next section we will be looking at constrained optimization of this GMM where the means should be the same.
+
+#### 4.3.2 Constrained EM Optimisation of GMMs
+
+```{r}
+dcomponents <- function(theta, x) {
+    mapply(
+      function(pi, mu, sigma) pi * dnorm(x, mu, sigma),
+      theta$pi, theta$mu, theta$sigma,
+      SIMPLIFY = TRUE
+    )
+}
+```
+
+```{r}
+# M-step functions, we include the general case such that we can verify the correctness of our implementation.
+
+M_step_general <- function(tau, x) {
+  pi    <- colMeans(tau)
+  mu    <- colSums(tau * x) / colSums(tau)
+  sigma <- sqrt(colSums(tau * x^2) / colSums(tau) - mu^2)
+  list(pi = pi, mu = mu, sigma = sigma)
+}
+
+M_step_same_means <- function(tau, x) {
+  n <- length(x)
+  K <- ncol(tau)
+  pi    <- colSums(tau) / n
+  muk   <- colSums(tau * x) / colSums(tau)
+  sigma <- sqrt(colSums(tau * x^2) / colSums(tau) - muk^2)
+  wk    <- n * pi / sigma^2
+  mu    <- rep(sum(wk * muk) / sum(wk), K)
+  list(pi = pi, mu = mu, sigma = sigma)
+}
+```
+
+```{r}
+mixture_gaussian1D <- function(x, theta0, M_step = M_step_general, max_iter = 100, threshold = 1e-6) {
+
+  ## initialization
+  n <- length(x)
+  likelihoods  <- dcomponents(theta0, x) 
+  deviance     <- numeric(max_iter)
+  deviance[1]  <- -2 * sum(log(rowSums(likelihoods)))
+
+  for (t in 1:max_iter) {
+    
+    # E step
+    tau <- likelihoods / rowSums(likelihoods)
+    # M step
+    theta <- M_step(tau, x)
+    
+    ## Assessing convergence
+    likelihoods   <- dcomponents(theta, x)
+    deviance[t+1] <- - 2 * sum(log(rowSums(likelihoods)))
+
+    ## prepare next iterations
+    
+    if (abs(deviance[t + 1] - deviance[t]) < threshold)
+      break
+    
+  }
+
+
+  list(theta = theta, deviance = deviance[t + 1])
+}
+```
+
+```{r}
+mu_data = mean(y)
+pi = c(.5, .5)
+means = c(mu_data, mu_data)
+variances = c(10,2)
+
+theta0  <- list(pi=pi, mu=means, sigma=variances)
+out_general <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_same_means)
+out_general$theta
+```
+
+To then compare the results of using different number of components we additionally define a experiment function.
+
+```{r}
+softmax <- function(x) {
+  exp_x <- exp(x)
+  exp_x / sum(exp_x)
+}
+
+constrained_gmm_experiment <- function(y, variances) {
+  n_components = length(variances)
+  
+  mu_data = mean(y)
+  
+  pi = softmax(rep(1, n_components))
+  means = rep(mu_data, n_components)
+  
+  theta0  <- list(pi=pi, mu=means, sigma=variances)
+  out_general <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_same_means)
+  out_general$theta
+  
+  # Define the data
+  x <- seq(-150, 150, length.out = 1000)
+  
+  # Compute the densities for the two components
+  densities <- dcomponents(out_general$theta, x)
+  
+  # Calculate the final density of the mixture
+  final_density <- rowSums(sapply(1:length(out_general$theta$pi), function(i) out_general$theta$pi[i] * dnorm(x, mean = out_general$theta$mu[i], sd = out_general$theta$sigma[i])))
+  
+  # Plot the data points
+  hist(y, breaks = 50, probability = TRUE, col = alpha("skyblue", 0.25), border = alpha("black", 0.25), main = paste("Mixture Model with", n_components, "Components"), xlab = "Daily Return", ylab = "Density")
+  
+  # Plot the densities for each component
+  for (i in 1:n_components) {
+    lines(x, densities[,i], col = rainbow(n_components)[i], lwd=2, lty=2)
+  }
+  
+  # Plot the final density of the mixture
+  lines(x, final_density, lwd = 2)
+  
+  # Add legend
+  legend_labels <- c(paste0("Component ", 1:n_components), "Mixture")
+  legend("topright", legend = legend_labels, col = c(rainbow(n_components), "black"), lty = 1, lwd = 2, pch = 20)
+}
+```
+
+```{r}
+constrained_gmm_experiment(y, variances = c(10, 5))
+```
+
+### 4.4 Student t-distribution
+
+**Task description:** As a third and last model, we propose to model the daily return as coming from a location-scale family of Student distributions, which is a model defined by the collection of densities $$f_{\nu,m,a}(x) = \frac{\Gamma\big(\frac{\nu+1}{2}\big)}{\sqrt{\pi \nu a^2}\Gamma\big(\frac{\nu}{2}\big)}\Bigg(1+\frac{(x-m)^2}{\nu a^2} \Bigg)^{-\frac{\nu+1}{2}}$$ where $\Gamma$ is the Gamma function and $\theta=(\nu,m,a) \in \mathbb{R}_+^*\times \mathbb{R}\times \mathbb{R}_+^*$ is the parameter.
+
+#### 4.4.1 Motivation behind model selection
+
+**Task description:** What is the motivation for considering this model?
+
+Indeed from looking at the above examples the final fits are still not great even when we add additional components to account for the variable variance of the distribution. But as we observe the distribution it is more clear that it can follow more closely a student t-distribution given its long tails and elongated middle density.
+
+#### 4.4.2 Fitting the student t-distribution 
+
+**Task description:** Propose an algorithm for estimating the parameter of this model and use it to fit this model to the data.
+
+```{r}
+# Define log-likelihood function for Student's t-distribution
+log_likelihood_student_t <- function(theta, x) {
+  nu <- theta[1]
+  mu <- theta[2]
+  sigma <- theta[3]
+  
+  # Check if sigma is positive
+  if(sigma <= 0) {
+    return(Inf)
+  }
+  
+  # Check if nu is at least 1
+  if(nu < 1) {
+    nu <- 1
+  }
+  
+  loglik <- sum(dt((x - mu) / sigma, df = nu, log = TRUE)) - length(x) * log(sigma)
+  
+  return(-loglik)  # Negative log-likelihood for minimization
+}
+
+# Fit Student's t-distribution model using MLE
+fit_student_t <- function(y) {
+  if (any(!is.finite(y))) {
+    stop("Input data contains non-finite values.")
+  }
+  
+  y <- y[is.finite(y)]
+  
+  if (length(y) < 3) {
+    stop("Insufficient data points for estimation.")
+  }
+  
+  init_params <- c(5, mean(y), sd(y))
+  opt_result <- optim(init_params, log_likelihood_student_t, x = y, method = "L-BFGS-B",
+                      lower = c(0, -Inf, 0), upper = c(Inf, Inf, Inf))
+  
+  # Extract optimized parameters
+  nu <- opt_result$par[1]
+  mu <- opt_result$par[2]
+  sigma <- opt_result$par[3]
+  
+  # Return parameter estimates
+  return(list(nu = nu, mu = mu, sigma = sigma))
+}
+
+# Fit Student's t-distribution model to the data
+student_t_params <- fit_student_t(y)
+student_t_params
+```
+
+```{r}
+# Generate data for the PDF using the fitted parameters
+x_range <- seq(min(y), max(y), length.out = 1000)
+pdf_values <- dt((x_range - student_t_params$mu) / student_t_params$sigma, 
+                 df = student_t_params$nu) / student_t_params$sigma
+
+# Create a data frame for plotting
+plot_data <- data.frame(x = x_range, pdf = pdf_values)
+
+# Plot histogram of the data and fitted PDF
+ggplot() +
+  geom_histogram(data = data.frame(y), aes(x = y, y = ..density..), bins = 30, fill = "skyblue", color = "black") +
+  geom_line(data = plot_data, aes(x = x, y = pdf), color = "red", size = 1) +
+  labs(title = "Fitted Student's t-distribution Model",
+       x = "Daily Return",
+       y = "Density") +
+  theme_minimal()
+```
