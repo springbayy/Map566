@@ -532,3 +532,11 @@ ggplot() +
        y = "Density") +
   theme_minimal()
 ```
+
+### 4.5 Model evaluation
+
+**Task description:** Between all the previous models (the normal, the 5 mixtures of normals, and the location-scale Student) which one do you choose? Explain your methodology.
+
+### 4.6 Expected daily return
+
+**Task description:** Is the expected daily return different than zero?
