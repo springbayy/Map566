@@ -323,6 +323,8 @@ We can observe that the final fits are indeed much better than the single Gaussi
 
 #### 4.3.2 Constrained EM Optimisation of GMMs
 
+To be able to optimize a GMM where the component means are constrained to be equal, we have to modify the classic expectation maximization algorithm to account for this specific constraint. First off, lets define the basic function for computing the density of a GMM which we will use later.
+
 ```{r}
 dcomponents <- function(theta, x) {
     mapply(
@@ -332,6 +334,23 @@ dcomponents <- function(theta, x) {
     )
 }
 ```
+
+Now that we have the above definition of a GMM density we can define how our new EM algorithm is going to work. As the EM algorithm is broken into two steps (E-step and M-step), we will first define the E-step.
+
+**E-step**
+
+As presented earlier we assume that we have some labels $Z_i$ which indicate what components model what sub-parts of the data. However, this is not something that we can know from beforehand. Thus, we compute the expected value of the statistic $\mathbb{E}[S(Z, Y) | Y ; \theta^{(t-1)}]$. Which we can denote using $\tau_{ik}^t$.
+
+$$
+\begin{align}
+\tau_{ik}^t &= \mathbb{E}[S(Z,Y) | Y; \theta^{(t-1)}] \\
+            &= \dfrac{\pi_k^{(t-1)} f_k(y_i;\theta^{(t-1)})}{\sum_{\mathcal{l}=0}^K \pi_k^{(t-1)} f_{\mathcal{l}} (y_i ; \theta^{(t-1)})}
+\end{align}
+$$
+
+Indeed, we see that there is no need to change anything in our E-step to achieve this constraint. However, we will have to deal with this in the M-step.
+
+**M-step**
 
 ```{r}
 # M-step functions, we include the general case such that we can verify the correctness of our implementation.
@@ -458,7 +477,7 @@ constrained_gmm_experiment(y, variances = c(10, 5))
 
 Indeed from looking at the above examples the final fits are still not great even when we add additional components to account for the variable variance of the distribution. But as we observe the distribution it is more clear that it can follow more closely a student t-distribution given its long tails and elongated middle density.
 
-#### 4.4.2 Fitting the student t-distribution 
+#### 4.4.2 Fitting the student t-distribution
 
 **Task description:** Propose an algorithm for estimating the parameter of this model and use it to fit this model to the data.
 
