@@ -303,7 +303,7 @@ fit_mixture_model <- function(n_components, y, max_iter = 400) {
     curve(result$pi[i] * dnorm(x, mean = result$mu[i], sd = result$sigma[i]), add = TRUE, col = i + 1, lwd=2, lty=2)
   }
   
-  return(list(result = result, mixture_EM = mixture_EM, log_likelihood = log_likelihood))
+  return(list(result = result, mixture_EM = mixture_EM, log_likelihood = log_likelihood, deviance= ))
 }
 ```
 
@@ -351,6 +351,28 @@ $$
 Indeed, we see that there is no need to change anything in our E-step to achieve this constraint. However, we will have to deal with this in the M-step.
 
 **M-step**
+
+For the M-step we follow a similar procedure but now we have to change the update for the means. Which will take the following form. First we have the same parameters,
+
+$$
+\begin{align}
+\hat{\pi}_k = \dfrac{\sum_{i=1}^K \tau_{ik}}{n} \hspace{5mm} \mu_k = \dfrac{\sum_{i=1}^K \tau_{ik} x_i}{\sum_{i=1}^K \tau_{ik}} \hspace{5mm} \hat{\sigma}_k^2 = \dfrac{\sum_{i=1}^K \tau_{ik} z_i^2}{\sum_{i=1}^K \tau_{ik}} - \mu_k^2
+\end{align}
+$$
+
+Note that we do not denote the mean with $\hat{\mu}$ above as it is only used on the optimization for the variance, to compute the new $\hat{\mu}$ we do the following.
+
+$$
+\hat{\mu}_k = \frac{\sum_{i=1}^K w_k \mu_k}{\sum_{i=1}^K w_k}
+$$
+
+Where $w_k$ is computed by.
+
+$$
+w_k = \dfrac{\sum_{i=1}^K \tau_{ik}}{\hat{\sigma}_{k}^2}
+$$
+
+We can then use this to create a modified version of the EM algorithm to deterministically obtain components with equal means.
 
 ```{r}
 # M-step functions, we include the general case such that we can verify the correctness of our implementation.
@@ -483,7 +505,7 @@ Indeed from looking at the above examples the final fits are still not great eve
 
 ```{r}
 # Define log-likelihood function for Student's t-distribution
-log_likelihood_student_t <- function(theta, x) {
+neglog_likelihood_student_t <- function(theta, x) {
   nu <- theta[1]
   mu <- theta[2]
   sigma <- theta[3]
@@ -516,7 +538,7 @@ fit_student_t <- function(y) {
   }
   
   init_params <- c(5, mean(y), sd(y))
-  opt_result <- optim(init_params, log_likelihood_student_t, x = y, method = "L-BFGS-B",
+  opt_result <- optim(init_params, neglog_likelihood_student_t, x = y, method = "L-BFGS-B",
                       lower = c(0, -Inf, 0), upper = c(Inf, Inf, Inf))
   
   # Extract optimized parameters
@@ -544,7 +566,7 @@ plot_data <- data.frame(x = x_range, pdf = pdf_values)
 
 # Plot histogram of the data and fitted PDF
 ggplot() +
-  geom_histogram(data = data.frame(y), aes(x = y, y = ..density..), bins = 30, fill = "skyblue", color = "black") +
+  geom_histogram(data = data.frame(y), aes(x = y, y = after_stat(density)), bins = 30, fill = "skyblue", color = "black") +
   geom_line(data = plot_data, aes(x = x, y = pdf), color = "red", size = 1) +
   labs(title = "Fitted Student's t-distribution Model",
        x = "Daily Return",
@@ -555,6 +577,60 @@ ggplot() +
 ### 4.5 Model evaluation
 
 **Task description:** Between all the previous models (the normal, the 5 mixtures of normals, and the location-scale Student) which one do you choose? Explain your methodology.
+
+To effectively evaluate the models we can employ a few techniques, the most obvious is to apply the BIC metric to measure how well the models capture the distribution of the data.
+
+```{r}
+bic_benchmark <- function(x, out_model, n_free_params) {
+  n <- length(x)
+  bic_values = list()
+  
+  return(out_model$deviance + log(n) * n_free_params)
+}
+```
+
+```{r}
+mu_data = mean(y)
+pi = c(.2, .2, .2, .2, .2)
+means = c(mu_data, mu_data, mu_data, mu_data, mu_data)
+variances = c(10, 7, 5, 3, 1)
+
+theta0  <- list(pi=pi, mu=means, sigma=variances)
+out_general <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_general)
+
+b_5unconstrained <- bic_benchmark(y, out_general, 3 * 5)
+
+out_general_constrained <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_same_means)
+
+b_5constrained <- bic_benchmark(y, out_general_constrained, 3 * 5)
+
+theta = student_t_params
+b_tdist = 3 * log(length(y)) + 2 * neglog_likelihood_student_t(c(theta$nu, theta$mu, theta$sigma), y)
+
+single_guass <- fitdistr(sp500_data$DailyReturn, "normal")
+b_single_gauss <- BIC(single_guass)
+```
+
+```{r}
+rbind(
+  five_comp_gmm             = b_5unconstrained,
+  five_comp_gmm_constrained = b_5constrained,
+  student_tdistribution     = b_tdist,
+  single_gaussian           = b_single_gauss
+) %>% as.data.frame() %>% setNames("BIC") %>% rmarkdown::paged_table()
+```
+
+```{r}
+ks.test(y, "pmixture", out_general_constrained$theta)
+```
+
+```{r}
+ks.test(y, "pmixture", out_general$theta)
+```
+
+```{r}
+ks.test(y, "pmixture", theta0)
+```
 
 ### 4.6 Expected daily return
 
