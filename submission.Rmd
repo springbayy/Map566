@@ -284,10 +284,7 @@ fit_mixture_model <- function(n_components, y, max_iter = 400) {
   kmeans_out <- kmeans(y, centers = n_components)
   mu <- as.vector(kmeans_out$centers)
   mixture_EM <- normalmixEM(y, mu = mu, k = n_components, arbvar = FALSE, maxit = max_iter)
-  
   log_likelihood <- mixture_EM$loglik
-  print(log_likelihood)
-  result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
   
   result <- list(pi = mixture_EM$lambda, mu = mixture_EM$mu, sigma = mixture_EM$sigma)
   
@@ -295,15 +292,17 @@ fit_mixture_model <- function(n_components, y, max_iter = 400) {
   hist(y, breaks = 50, probability = TRUE, col = alpha("skyblue", 0.25), border = alpha("black", 0.25), main = paste("Mixture Model with", n_components, "Components"), xlab = "Daily Return", ylab = "Density")
   
   # Add density line
-  lines(density(mixture_EM$x), col="red", lwd=2)
+  final_density <- rowSums(sapply(1:length(mixture_EM$lambda), function(i) mixture_EM$lambda[i] * dnorm(x, mean = mixture_EM$mu[i], sd = mixture_EM$sigma[i])))
+  
+  x <- seq(min(y), max(y), length.out = 1000)
+  lines(x, final_density, lwd = 2)
   
   # Plot densities of Gaussian components
-  x <- seq(min(y), max(y), length.out = 1000)
   for (i in 1:n_components) {
     curve(result$pi[i] * dnorm(x, mean = result$mu[i], sd = result$sigma[i]), add = TRUE, col = i + 1, lwd=2, lty=2)
   }
   
-  return(list(result = result, mixture_EM = mixture_EM, log_likelihood = log_likelihood, deviance= ))
+  return(list(result = result, mixture_EM = mixture_EM, log_likelihood = log_likelihood))
 }
 ```
 
@@ -460,7 +459,7 @@ constrained_gmm_experiment <- function(y, variances) {
   out_general$theta
   
   # Define the data
-  x <- seq(-150, 150, length.out = 1000)
+  x <- seq(min(y), max(y), length.out = 1000)
   
   # Compute the densities for the two components
   densities <- dcomponents(out_general$theta, x)
@@ -486,7 +485,11 @@ constrained_gmm_experiment <- function(y, variances) {
 ```
 
 ```{r}
-constrained_gmm_experiment(y, variances = c(10, 5))
+constrained_gmm_experiment(y, variances = c(10, 7))
+constrained_gmm_experiment(y, variances = c(10, 7, 5))
+constrained_gmm_experiment(y, variances = c(10, 7, 5, 3))
+constrained_gmm_experiment(y, variances = c(10, 7, 5, 3, 1))
+constrained_gmm_experiment(y, variances = c(12, 10, 7, 5, 3, 1))
 ```
 
 ### 4.4 Student t-distribution
@@ -578,7 +581,21 @@ ggplot() +
 
 **Task description:** Between all the previous models (the normal, the 5 mixtures of normals, and the location-scale Student) which one do you choose? Explain your methodology.
 
-To effectively evaluate the models we can employ a few techniques, the most obvious is to apply the BIC metric to measure how well the models capture the distribution of the data.
+To effectively evaluate the models we can employ a few techniques, the most obvious is to apply the BIC metric to measure how well the models capture the distribution of the data. Which is simply done by applying the following formula:
+
+$$
+BIC = k \hspace{1mm} ln(n) - 2 \hspace{1mm} ln(\hat{L})
+$$
+
+Where we have the following parameters to compute:
+
+-   $\hat{L}$: the maximized likelihood of the model.
+
+-   $n$: the number of data points in the dataset.
+
+-   $k$: the number of free parameters in our model (note for the constrained GMM this will be different).
+
+We then go ahead and apply this metric to the models so far and put the results in a table seen below.
 
 ```{r}
 bic_benchmark <- function(x, out_model, n_free_params) {
@@ -602,7 +619,7 @@ b_5unconstrained <- bic_benchmark(y, out_general, 3 * 5)
 
 out_general_constrained <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_step = M_step_same_means)
 
-b_5constrained <- bic_benchmark(y, out_general_constrained, 3 * 5)
+b_5constrained <- bic_benchmark(y, out_general_constrained, 2 * 5 + 1) # Only one mu is optimised
 
 theta = student_t_params
 b_tdist = 3 * log(length(y)) + 2 * neglog_likelihood_student_t(c(theta$nu, theta$mu, theta$sigma), y)
@@ -620,6 +637,13 @@ rbind(
 ) %>% as.data.frame() %>% setNames("BIC") %>% rmarkdown::paged_table()
 ```
 
+By only observing the BIC values it might seem that the single Gaussian is the best model. However, this should not be the case, indeed we need to perform additional tests. The Kolmogorov-Smirnov test can work for this, and we can expect to see that the single Gaussian is rejected. Where we have the following null- and alternative hypothesis
+
+$$
+H_0: \text{the empirical distribution of the data fits the theoretical distribution} \\
+H_1: \text{The empirical distribution does not fit the theoretical distribution}
+$$
+
 ```{r}
 ks.test(y, "pmixture", out_general_constrained$theta)
 ```
@@ -631,6 +655,39 @@ ks.test(y, "pmixture", out_general$theta)
 ```{r}
 ks.test(y, "pmixture", theta0)
 ```
+
+```{r}
+# Function to compute CDF of Student's t-distribution
+cdf_student_t <- function(x, nu, mu, sigma) {
+  pt((x - mu) / sigma, df = nu)
+}
+
+# Perform KS test
+ks_test_student_t <- function(y, student_t_params) {
+  # Extract parameters
+  nu <- student_t_params$nu
+  mu <- student_t_params$mu
+  sigma <- student_t_params$sigma
+  
+  # Compute CDF values
+  cdf_values <- cdf_student_t(sort(y), nu, mu, sigma)
+  
+  # Compute ECDF values
+  ecdf_values <- ecdf(y)(sort(y))
+  
+  # Perform KS test
+  ks_result <- ks.test(ecdf_values, cdf_values)
+  
+  return(ks_result)
+}
+
+# Perform KS test on the data using the fitted Student's t-distribution parameters
+ks_result <- ks_test_student_t(y, student_t_params)
+ks_result
+
+```
+
+Thus, we can quite confidently conclude that we can reject the single Gaussian as a model (as the null-hypothesis is rejected) and announce the Student t-distribution to be the best distribution given the data. Which makes intuitive sense given the fact that the distribution of the data much more resemble that of a Student t-distribution.
 
 ### 4.6 Expected daily return
 
