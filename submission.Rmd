@@ -197,6 +197,206 @@ Immediately we can observe that we have significantly less data than for the oth
 
 ## 2. Gene expression data
 
+```{r}
+load("liver_data.rda")
+```
+
+### 2.1  We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot `cholesterol` as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and `cholesterol`?
+
+
+```{r}
+labels <- colnames(liver)
+
+maxSlope=0
+minP=1
+
+for (i in 2:3117){
+  lmgene <- lm(cholesterol~liver[,i], data=liver)
+  slope <- abs(coef(lmgene, complete = TRUE)[2])
+  summary_stats <- summary(lmgene)
+  p_value <- summary_stats$coefficients[2, 4]
+  
+  if (slope > maxSlope){
+    maxSlope=slope
+    max_slope_model=lmgene
+  }
+  
+  if (minP > p_value){
+    minP=p_value
+    min_p_model=lmgene
+    genename=labels[i]
+  }
+}
+
+```
+
+
+Fitting a linear model for every gene, we get 3116 different models in total. The null-hypothesis is that a gene does no have a correlation with the cholesterol-level, in other words, the slope is zero in this case. Consequently, the gene corresponding to the model with the lowest p-value is also the model with highest slope. In our case, that turned out to be gene $A\_42P631473$ with a p-value of less than $10^{-13}$.
+
+```{r}
+
+ggplotRegression <- function (fit) {
+
+require(ggplot2)
+
+ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") +
+  labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                     "Intercept =",signif(fit$coef[[1]],5 ),
+                     " Slope =",signif(fit$coef[[2]], 5),
+                     " P =",signif(summary(fit)$coef[2,4], 5)), x = paste(genename, "-expression"))
+}
+
+ggplotRegression(min_p_model)
+#ggplotRegression(max_slope_model)
+
+
+```
+
+
+
+## 2.2  We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains `cholesterol` as a function of the gene expression and compute the p-value of the test. AND
+
+## 2.3  Order the p-values and plot the ordered p-values as a function of their rank. On the same plot, display the line $y = x/3116$. Discuss the result.
+
+```{r}
+labels <- colnames(liver)
+
+p_list <- c()
+lineList = c()
+
+for (i in 2:3117){
+  lmgene <- lm(cholesterol~liver[,i], data=liver)
+  slope <- abs(coef(lmgene, complete = TRUE)[2])
+  summary_stats <- summary(lmgene)
+  p_value <- summary_stats$coefficients[2, 4]
+  p_list=c(p_list, p_value)
+  lineList = c(lineList, (i-1)/3116)
+}
+
+p_list=sort(p_list)
+plot(p_list, col = "blue", lwd = 2, xlab = "Rank", ylab = "p-value")
+lines(lineList, col = "red", lwd = 2)
+
+legend("topleft", legend = c("p-values", "Uniform line"), col = c("blue", "red"), lwd = 2)
+
+
+```
+Plotting all values, we can conclude that there are amount of models that have a p-value below 0.05. It is tempting to make the conclusion that all these models are statistically significant since they all have a small p-value. However, in the event that the we only have random data, we still expect 5\% of the models to appear significantly significant. In fact, if we were to only have random data, we expect a uniform distribution between 0 and 1 for the p-values. Visually, looking at the Figure above, we can the p-values perform better that the uniform distribution and therefore appear to contain significant findings.
+
+
+
+```{r}
+labels <- colnames(liver)
+
+p_list_shuffeled <- c()
+lineList_shuffeled = c()
+
+for (i in 2:3117){
+  cholesterol=liver$cholesterol
+  randomLabel <- sample(cholesterol)
+  lmgene <- lm(randomLabel~liver[,i], data=liver)
+  slope <- abs(coef(lmgene, complete = TRUE)[2])
+  summary_stats <- summary(lmgene)
+  p_value <- summary_stats$coefficients[2, 4]
+  p_list_shuffeled=c(p_list_shuffeled, p_value)
+  lineList_shuffeled = c(lineList_shuffeled, (i-1)/3116)
+}
+
+p_list_shuffeled=sort(p_list_shuffeled)
+plot(p_list_shuffeled, col = "blue", lwd = 2, xlab = "Rank", ylab = "p-value", main = "Shuffeled labels")
+lines(lineList_shuffeled, col = "red", lwd = 2)
+
+legend("topleft", legend = c("p-values when shuffeled labels", "Uniform line"), col = c("blue", "red"), lwd = 2)
+
+```
+ In the nest question, we are tasked with finding the maximum number of genes such that the expected number of false discoveries is at most 5\%. For this method, we use the Benjamini-Hochberg procedure \cite{FDR}. In short, it states that if we have a set of $\{ H_1, H_2, ... \: , H_m \}$ with associated and ordered p-values $\{ p_1, p_2, ... \: , p_m \}$, then the threshold for the index can be written as:
+
+##2.4
+
+$$ P_{BH}= max_i \left\{ P_{(i)} : P_{(i)} \leq \alpha \frac{i}{m}      \right\} $$
+
+
+
+```{r}
+
+soft_guarantee=c()
+alpha=0.05
+index=0
+n=3116
+
+
+
+for (i in 1:3116){
+  val=i*alpha/n
+  soft_guarantee=c(soft_guarantee, val)
+  if (p_list[i]<val){
+    index=i
+  }
+
+}
+
+print(index)
+
+
+plot(p_list, col = "blue", lwd = 2, xlab = "Index", ylab = "p-value")
+lines(soft_guarantee, col = "red", lwd = 2)
+abline(v=index, col="black")
+legend("topleft", legend = c("Benjamini-Hochberg boundary", "P-value", paste("Intersect=", as.character(index))), col = c("red", "blue", "black"), lwd = 2)
+
+plot(p_list[1:1200], col = "blue", lwd = 2, xlab = "Index", ylab = "p-value")
+lines(soft_guarantee[1:1200], col = "red", lwd = 2)
+abline(v=index, col="black")
+legend("topleft", legend = c("Benjamini-Hochberg boundary", "P-value", paste("Intersect=", as.character(index))), col = c("red", "blue", "black"), lwd = 2)
+
+
+```
+We can see that $\alpha \frac{i}{m}$ plots out a line, and we choose i such that $P_{(i)}$ always is smaller or equal to that value. Doing so, we get 941 discoveries such that the expected number of false discoveries is no more than 5 \%
+
+##2.5 A stronger guarantee would be that on impose that there shouldn't be more than a 5 \% risk that any discovery is false. For this method, we use the Holm–Bonferroni method. The method is as follows:\\
+
+
+I have my ordered p-values, $\{ P_1, P_2, ... \: , P_m \}$, and want the FWER to be no higher than a level $\alpha$.
+Is $P_1 < \alpha/m$? so, reject $H_1$ and continue to the next step, otherwise EXIT.
+Is $P_2 < \alpha/(m-1)$? so, reject $H_2$ and continue to the next step, otherwise EXIT. 
+
+Continue this iterative process as long as $P_k < \frac{\alpha}{m+1-k}$. Using this process, we get the following result:
+
+```{r}
+
+strong_guarantee=c()
+alpha=0.05
+index=0
+
+for (i in 1:n){
+  val=alpha/(n+1-i)
+  strong_guarantee=c(strong_guarantee, val)
+  if (p_list[i]<val){
+    index=i
+  }
+
+}
+
+
+plot(p_list, col = "blue", lwd = 2, xlab = "Index", ylab = "p-value")
+lines(strong_guarantee, col = "red", lwd = 2)
+abline(v=index, col="black", )
+legend("topleft", legend = c("Holm–Bonferroni", "P-value", paste("Intersect=", as.character(index))), col = c("red", "blue", "black"), lwd = 2)
+
+
+plot(p_list[1:225], col = "blue", lwd = 2, xlab = "Index", ylab = "p-value")
+lines(strong_guarantee, col = "red", lwd = 2)
+abline(v=index, col="black", )
+legend("bottomright", legend = c("Holm–Bonferroni", "P-value", paste("Intersect=", as.character(index))), col = c("red", "blue", "black"), lwd = 2)
+
+
+
+```
+
+Using this process, we see that we get 223 discoveries. We also not that smallest p-value in that set is approximately equal to $1.7 \cdot 10^{-5}$.
+
+
 ## 3. Non parametric regression
 
 ## 4. S&P500 daily return
