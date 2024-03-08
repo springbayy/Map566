@@ -10,6 +10,7 @@ library(dplyr)
 library(tidyverse)
 library(MASS)
 library(mixtools)
+library(pwr)
 ```
 
 # Statistics in Action - Homework
@@ -113,6 +114,8 @@ t.test(diabetic$Glu, non_diabetic$Glu, alternative="two.sided")
 
 Given that $\alpha = 0.05$ we can reject the null-hypothesis and say that our results of this test is significant and shows that we do not have enough evidence to conclude that the means between the two groups are indeed the same.
 
+Furthermore, it is worth noting that the sample size between the two groups are different and thus the traditional t-test mechanisms are changed to account for this. However, the techniques used above will be able to handle this internally.
+
 ### 1.2 Diabetic mean blood glucose level between adults and seniors
 
 **Task description:** Test for the diabetic respondents if the mean level of blood glucose after fasting is the same for adults and seniors.
@@ -189,7 +192,22 @@ combined_data <- rbind(diabetic_active, diabetic_inactive)
 rmarkdown::paged_table(combined_data)
 ```
 
-Immediately we can observe that we have significantly less data than for the other exercises, which can indicate that test results can be inconclusive.
+Immediately we can observe that we have significantly less data than for the other exercises, which can indicate that test results can be inconclusive. To verify how many samples we should have to be able to be able to perform such a test, we can use the power of a t-test. To apply this test we have to understand what
+
+```{r}
+
+# Perform power analysis
+n_active <- 4  # Sample size of the active group
+n_inactive <- 9  # Sample size of the inactive group
+
+sp <- sqrt(((n_active-1)*sd(diabetic_active$Glu)**2 + (n_inactive - 1)*sd(diabetic_inactive$Glu)**2**2)/(n_active+n_inactive-2))
+effect_size <- (mean(diabetic_active$Glu) - mean(diabetic_inactive$Glu))/sp
+alpha <- 0.05  # Significance level
+
+# Perform power analysis
+pwr.t.test(n = NULL, d = effect_size, sig.level = alpha, power = 0.5,
+                              alternative = "two.sided")
+```
 
 ### 1.4 Same proportion of male and female diabetics
 
