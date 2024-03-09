@@ -238,15 +238,34 @@ As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the nu
 
 **Task description:** Test if the proportion of diabetic is the same for male and female respondents. Compare conclusions of several tests. You can use the function `table` to compute contingency tables.
 
+First we compute the contingency table which we will use to be able to test whether the proportion of diabete males and females are the same.
+
 ```{r}
 diabete_and_nondiabete = filter(data, Diabete != 3)
 contingency_table <- table(diabete_and_nondiabete$Sex, diabete_and_nondiabete$Diabete)
 contingency_table
 ```
 
+One method is the Fisher test, which does not rely on sample sizes and can compute p-values exactly. Where we have the following hypotheses:
+
+$$
+H_0: \hspace{5mm} P_{\text{female-diabetic}} =  P_{\text{male-diabetic}} \\
+H_1: \hspace{5mm} P_{\text{female-diabetic}} \neq  P_{\text{male-diabetic}}
+$$
+
 ```{r}
 fisher.test(contingency_table)
 ```
+
+Indeed we do not observe that the null-hypothesis is rejected. However, we do note an odds ratio of around 64.7% thus it is slightly more expected for one group to be assigned the diabete label. But again the p-value is not significant enough to draw any conclusions.
+
+Further, one could assume some form of normal approximation of the data and in that case we can apply a 2-sample test for the equality of proportions. Which assumes that the difference between the proportions can be drawn from the following normal.
+
+$$
+\hat{p}_A - \hat{p}_B \sim \mathcal{N}\left(0, p(1-p) \left( \dfrac{1}{n_A} + \dfrac{1}{n_B} \right) \right)
+$$
+
+Which we can formulate through the following test.
 
 ```{r}
 diabetes = c(8, 13)
@@ -255,9 +274,13 @@ population = c(nrow(filter(data, Sex==1)), nrow(filter(data, Sex==2)))
 prop.test(diabetes, population, correct = FALSE)
 ```
 
+Again we cannot reject the null-hypothesis as the p-value is not significant. Another approach which builds on top of this is the Yates continuity correction which subtracts 0.5 from the difference between each observed value to lower the chi-squared value and thus boost the p-value.
+
 ```{r}
 prop.test(diabetes, population, correct = TRUE)
 ```
+
+As this test implicitly increases the p-value we of course cannot expect to reject the null-hypothesis with this test given the results above. Therefore, from the collection of tests above we cannot reject the null-hypothesis and can conclude that the proportion of male and female diabetes are the same.
 
 ## 2. Gene expression data
 
@@ -494,7 +517,7 @@ theme(axis.text.x = element_blank(),
       axis.title.x = element_blank())
 ```
 
-Under Louis Bachelier's "Theory of Speculation" assume that the returns can be sampled from a perfectly random distribution, in this case this would be a normal distribution which we can parametirise through a Gaussian model. Assume that the return is modeled by some random variable $X_r$ and that some value of that RV is denoted by $x_t$. Thus, since we first assume Bachelier's theory we can model the RV through the following Gaussian.
+Under Louis Bachelier's "Theory of Speculation" one assumes that the returns can be sampled from a perfectly random distribution, in this case this would be a normal distribution which we can parametirise through a Gaussian model. Assume that the return is modeled by some random variable $X_r$ and that some value of that RV is denoted by $x_t$. Thus, since we first assume Bachelier's theory we can model the RV through the following Gaussian.
 
 $$    X_r \sim \mathcal{N}(\mu_r, \sigma_r^2)    $$ Where the model parameters are the empirical mean and empirical variance expressed by: $$    \mu_r = \dfrac{\sum_{i=0}^N x_i}{N} \hspace{5mm} \sigma_r^2 = \dfrac{\sum_{i=0}^N (x_i - \mu_r)}{N}    $$ We can then directly fit such a Gaussian model in R through the following:
 
@@ -510,13 +533,13 @@ curve(dnorm(x, mean = fit$estimate[1], sd = fit$estimate[2]),
       col = "blue", lwd = 2, add = TRUE, yaxt = "n")
 ```
 
-Indeed, the it seems that Bachelier's theory does describe the price movements well. As the daily return resembles a normal distribution, however, we do observe that that tails seem to follow a higher variance compared to the density around the mean which seems to have a smaller variance. Which also explains why our initial Gaussian doesn't effectively capture this density. Thus, we can motivate why a Gaussian mixture model might perform better in this scenario.
+Indeed, the it seems that Bachelier's theory does describe the price movements to some extent. However, we do observe that that tails seem to follow a higher variance compared to the density around the mean which seems to have a smaller variance. Which also explains why our initial Gaussian doesn't effectively capture this distribution. Thus, we can motivate why a Gaussian mixture model might perform better in this scenario.
 
 ### 4.3 Gaussian Mixture Model
 
 **Task description:** Instead of a single normal, we now propose to use a mixture of normals with $p$ components. Write the corresponding models and use *R* to fit them to the data for all values of $p$ between $2$ and $6$. Discuss the results and compare them with the model of Question 1.
 
-To combine the multiple Gaussians to model a single valid PDF, we will have to introduce a weight parameter which will be used between the weighted sum of Gaussian components. First, we denote a single component the following way. $$    Y_r \sim \mathcal{N}(\theta_k) \hspace{5mm} \text{Where $\theta$ is a parameter vector for component $k$ defined by} \hspace{5mm} \theta_k = \left[ \mu_k, \sigma_k^2 \right]    $$ Furthermore, to form the mixture we introduce the weight parameter $\pi_k$ which is probabilistic and forms the weighted sum (GMM). $$    Y_i = \sum_{k=1}^K \pi_k \mathcal{N}(\theta_k)    $$ As this is a weighted sum and we expect $Y_i$ to be modeled from a valid PDF, we have to constrain the weights such that: $$    \pi_k \geq 0 \hspace{2.5mm} \land \hspace{2.5mm} \sum_{k=1}^K \pi_k = 1    $$ Which is the case as long as we follow that $\pi_k$ comes from a PDF defined over the categorical RVs $Z_i$ which defines the different components such that we have: $$    P(Z_i = k) = \pi_k \hspace{5mm} \text{Where $Z$ is a sequence of RVs} \hspace{5mm} \{1, 2, \dots, K\}    $$ Thus, we observe that we first have to initialize the parameters of the model which we can do by placing the means based on a K-Means initialization and set some explicit variance which will serve as the initialization for the iterative EM-algorithm for parameter optimization over such a GMM. First off, we will naively apply a GMM routine to this problem using expectation maximization which we will compare against an constrained optimization approach where we ensure equal means for all distributions as it seems to only be the variance that's needed to change based on our earlier graph.
+To combine the multiple Gaussians to model a single valid PDF, we will have to introduce a weight parameter which will be used on the weighted sum of Gaussian components. First, we denote a single component the following way. $$    Y_r \sim \mathcal{N}(\theta_k) \hspace{5mm} \text{Where $\theta$ is a parameter vector for component $k$ defined by} \hspace{5mm} \theta_k = \left[ \mu_k, \sigma_k^2 \right]    $$ Furthermore, to form the mixture we introduce the weight parameter $\pi_k$ which is probabilistic and forms the weighted sum (GMM). $$    Y_i = \sum_{k=1}^K \pi_k \mathcal{N}(\theta_k)    $$ As this is a weighted sum and we expect $Y_i$ to be modeled from a valid PDF, we have to constrain the weights such that: $$    \pi_k \geq 0 \hspace{2.5mm} \land \hspace{2.5mm} \sum_{k=1}^K \pi_k = 1    $$ Which is the case as long as we follow that $\pi_k$ comes from a PDF defined over the categorical RVs $Z_i$ which defines the different components such that we have: $$    P(Z_i = k) = \pi_k \hspace{5mm} \text{Where $Z$ is a sequence of RVs} \hspace{5mm} \{1, 2, \dots, K\}    $$ Thus, we observe that we first have to initialize the parameters of the model which we can do by placing the means based on a K-Means initialization and set some explicit variance which will serve as the initialization for the iterative EM-algorithm for parameter optimization over such a GMM. First off, we will naively apply a GMM routine to this problem using expectation maximization which we will compare against a constrained optimization approach where we ensure equal means for all components as it seems to only be the variance that's needed to change based on our earlier graph.
 
 #### 4.3.1 Unconstrained EM Optimization of GMMs
 
@@ -573,7 +596,26 @@ mx6 <- fit_mixture_model(6, y)
 mixtures = c(mx2, mx3, mx4, mx5, mx6)
 ```
 
-We can observe that the final fits are indeed much better than the single Gaussian example. However, we do observe that there is some overfitting happening at the tails of the distribution for all of the experiments we have run. This is caused by the fact that the means are not the same for all the Gaussian components and thus for our next section we will be looking at constrained optimization of this GMM where the means should be the same.
+We can observe that the final fits are indeed much better than the single Gaussian example. However, we do observe that there is some over fitting happening at the tails of the distribution for all of the experiments we have run. This is caused by the fact that the means are not the same for all the Gaussian components and thus for our next section we will be looking at constrained optimization of this GMM where the means should be the same.
+
+```{r}
+bic <- function(model) {
+  n_free_params <- length(mx2$result$pi)
+  n <- length(model$mixture_EM$x)
+  
+  return(-2 * model$log_likelihood + log(n) * n_free_params)
+}
+
+rbind(
+  gmm_2 = bic(mx2),
+  gmm_3 = bic(mx3),
+  gmm_4 = bic(mx4),
+  gmm_5 = bic(mx5),
+  gmm_6 = bic(mx6)
+) %>% as.data.frame() %>% setNames("BIC") %>% rmarkdown::paged_table()
+```
+
+Purely based on the BIC values obtained above we can say that the GMMs with 4 and 5 components are the best due to having the lowest BIC values. However, whilst looking at the density plots from above, one can clearly observe that these model overfit the data as it adapts to local variations along the tails of the GMM. Thus, a natural progression is to observe how we can improve these GMMs through a constrained optimisation where the means of the components are fixed to be the same. Such that we can ignore such local variations.
 
 #### 4.3.2 Constrained EM Optimisation of GMMs
 
@@ -736,16 +778,51 @@ constrained_gmm_experiment <- function(y, variances) {
   # Add legend
   legend_labels <- c(paste0("Component ", 1:n_components), "Mixture")
   legend("topright", legend = legend_labels, col = c(rainbow(n_components), "black"), lty = 1, lwd = 2, pch = 20)
+  
+  return (out_general=out_general)
 }
 ```
 
 ```{r}
-constrained_gmm_experiment(y, variances = c(10, 7))
-constrained_gmm_experiment(y, variances = c(10, 7, 5))
-constrained_gmm_experiment(y, variances = c(10, 7, 5, 3))
-constrained_gmm_experiment(y, variances = c(10, 7, 5, 3, 1))
-constrained_gmm_experiment(y, variances = c(12, 10, 7, 5, 3, 1))
+mu_mx2 <- constrained_gmm_experiment(y, variances = c(10, 7))
+mu_mx3 <-constrained_gmm_experiment(y, variances = c(10, 7, 5))
+mu_mx4 <-constrained_gmm_experiment(y, variances = c(10, 7, 5, 3))
+mu_mx5 <-constrained_gmm_experiment(y, variances = c(10, 7, 5, 3, 1))
+mu_mx6 <-constrained_gmm_experiment(y, variances = c(12, 10, 7, 5, 3, 1))
 ```
+
+```{r}
+mu_mx2
+```
+
+By simply observing the produced densities for the new GMMs it is much better then the standard GMM approach. As it quite nicely ignores such local variantions along the tails of the distribution. To evaluate the different fits for these Gaussians we perform the BIC tests again.
+
+```{r}
+bic_devicances <- function(model) {
+  n_free_params <- length(out_general$theta$pi)
+  n <- length(y)
+  
+  return(model$deviance + log(n) * n_free_params)
+}
+
+rbind(
+  gmm_2 = bic_devicances(mu_mx2),
+  gmm_3 = bic_devicances(mu_mx3),
+  gmm_4 = bic_devicances(mu_mx4),
+  gmm_5 = bic_devicances(mu_mx5),
+  gmm_6 = bic_devicances(mu_mx6)
+) %>% as.data.frame() %>% setNames("BIC (Constrained GMM)") %>% rmarkdown::paged_table()
+
+rbind(
+  gmm_2 = bic(mx2),
+  gmm_3 = bic(mx3),
+  gmm_4 = bic(mx4),
+  gmm_5 = bic(mx5),
+  gmm_6 = bic(mx6)
+) %>% as.data.frame() %>% setNames("BIC (Standard GMM)") %>% rmarkdown::paged_table()
+```
+
+We already see a significant improvement in BIC for the constrained optimization version of the GMM, here the 5 component model is the one with the lowest BIC value and thus the best model in terms of BIC. Therefore, this demonstrates clearly the fact that the standard GMM was overfitting to the data and was not able to converge to the optimal solution.
 
 ### 4.4 Student t-distribution
 
@@ -755,11 +832,13 @@ constrained_gmm_experiment(y, variances = c(12, 10, 7, 5, 3, 1))
 
 **Task description:** What is the motivation for considering this model?
 
-Indeed from looking at the above examples the final fits are still not great even when we add additional components to account for the variable variance of the distribution. But as we observe the distribution it is more clear that it can follow more closely a student t-distribution given its long tails and elongated middle density.
+Indeed from looking at the above examples for the standard GMM the final fits are still not great even when we add additional components to account for the variable variance of the distribution. But as we observe the distribution it is more clear that it can follow more closely a student t-distribution given its long tails and elongated middle density.
 
 #### 4.4.2 Fitting the student t-distribution
 
 **Task description:** Propose an algorithm for estimating the parameter of this model and use it to fit this model to the data.
+
+Given that we have the PDF of the student t-distribution above, we want to minimise its negative log-likelihood over the data. Which will result in of course maximising the overall likelihood and thus obtain a convergence. One can achieve this through an optimiser such as L-BFGS-B which is a gradient based method which computes the gradient $\nabla f(x; \theta)$ where in our case the loss function is defined by the negative log likelihood. We perform negative log likelihood due to the fact that this method aims to minimise along the largest negative gradient, and we use log values to avoid gradient vanishing through large float values.
 
 ```{r}
 # Define log-likelihood function for Student's t-distribution
@@ -832,6 +911,8 @@ ggplot() +
   theme_minimal()
 ```
 
+As we can observe we obtain a very nice fit for the distribution of the data using the student t-distribution, demonstrating the fact that the data seems to more distributed along a student t-distribution. We will in now compare how this model performs wrt the other methods in the following section.
+
 ### 4.5 Model evaluation
 
 **Task description:** Between all the previous models (the normal, the 5 mixtures of normals, and the location-scale Student) which one do you choose? Explain your methodology.
@@ -892,7 +973,7 @@ rbind(
 ) %>% as.data.frame() %>% setNames("BIC") %>% rmarkdown::paged_table()
 ```
 
-By only observing the BIC values it might seem that the single Gaussian is the best model. However, this should not be the case, indeed we need to perform additional tests. The Kolmogorov-Smirnov test can work for this, and we can expect to see that the single Gaussian is rejected. Where we have the following null- and alternative hypothesis
+By only observing the BIC values it is clear that the 5 component GMM constrained on means is the best model. Notably we might want to reject the single Gaussian model completely, and we can do this through the Kolmogorov-Smirnov test can work for this. Where we have the following null- and alternative hypothesis are defined as follows.
 
 $$
 H_0: \text{the empirical distribution of the data fits the theoretical distribution} \\
@@ -900,50 +981,19 @@ H_1: \text{The empirical distribution does not fit the theoretical distribution}
 $$
 
 ```{r}
-ks.test(y, "pmixture", out_general_constrained$theta)
-```
-
-```{r}
-ks.test(y, "pmixture", out_general$theta)
-```
-
-```{r}
 ks.test(y, "pmixture", theta0)
 ```
 
-```{r}
-# Function to compute CDF of Student's t-distribution
-cdf_student_t <- function(x, nu, mu, sigma) {
-  pt((x - mu) / sigma, df = nu)
-}
-
-# Perform KS test
-ks_test_student_t <- function(y, student_t_params) {
-  # Extract parameters
-  nu <- student_t_params$nu
-  mu <- student_t_params$mu
-  sigma <- student_t_params$sigma
-  
-  # Compute CDF values
-  cdf_values <- cdf_student_t(sort(y), nu, mu, sigma)
-  
-  # Compute ECDF values
-  ecdf_values <- ecdf(y)(sort(y))
-  
-  # Perform KS test
-  ks_result <- ks.test(ecdf_values, cdf_values)
-  
-  return(ks_result)
-}
-
-# Perform KS test on the data using the fitted Student's t-distribution parameters
-ks_result <- ks_test_student_t(y, student_t_params)
-ks_result
-
-```
-
-Thus, we can quite confidently conclude that we can reject the single Gaussian as a model (as the null-hypothesis is rejected) and announce the Student t-distribution to be the best distribution given the data. Which makes intuitive sense given the fact that the distribution of the data much more resemble that of a Student t-distribution.
+Thus, we can quite confidently conclude that we can reject the single Gaussian as a model (as the null-hypothesis is rejected) and announce the 5 component constrained GMM as the "best" model. However, this does not mean that the student t-distribution doesn't model the data well.
 
 ### 4.6 Expected daily return
 
 **Task description:** Is the expected daily return different than zero?
+
+As we have seen above, a single normal cannot model the data effectively. Thus, one will have to use an hypothesis with no normality assumption. Which can be done through a Wilcoxon test as we have seen in the previous exercises.
+
+```{r}
+wilcox.test(y, mu=0, alternative="two.sided")
+```
+
+Based on the results of this test, we can reject the null-hypothesis and thus conclude that the expected mean is not equal to 0. Which further highlights the fact that the student t-distribution is not the best model for this data given the fact that the mean of a student t-distribution is 0.
