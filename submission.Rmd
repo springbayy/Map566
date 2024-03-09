@@ -267,6 +267,8 @@ load("liver_data.rda")
 
 ## 2.1 Finding most significant discovery
 
+**Task description:**: We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot cholesterol as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and cholesterol?
+
 We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot `cholesterol` as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and `cholesterol`?
 
 ```{r}
@@ -319,6 +321,7 @@ ggplotRegression(min_p_model)
 ```
 
 ## 2.2 Calculating all p-values
+**Task description:**: We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains cholesterol as a function of the gene expression and compute the p-value of the test.
 
 We now do the same test for all 3116 genes and fit a linear model that explains `cholesterol` as a function of the gene expression. Doing so gives us a relatively large proportion of genes that correspond to a p-value of less than 0.05
 
@@ -345,6 +348,8 @@ plot(hist(p_list, breaks=20, col = c("orange", rep("lightblue", 100))), main = "
 ```
 
 ## 2.3 Ordering p-values
+
+**Task description:**Order the p-values and plot the ordered as a function of their rank. On the same plot, display the line y=x/3116. Discuss the result.
 
 Plotting all values, we can conclude that there are amount of models that have a p-value below 0.05. It is tempting to make the conclusion that all these models are statistically significant since they all have a small p-value. However, in the event that the we only have random data, we still expect 5% of the models to appear significantly significant. In fact, if we were to only have random data, we expect a uniform distribution between 0 and 1 for the p-values. Visually, looking at the figure above, we can the p-values perform better that the uniform distribution and therefore appear to contain significant discoveries.
 
@@ -388,6 +393,7 @@ plot(hist(p_list_shuffeled, breaks=20, col = c("orange", rep("lightblue", 100)))
 
 ```
 ## 2.4 Benjamini-Hochberg procedure
+**Task description:**Identify a set of genes linked to the response (aka discoveries). We want to guarantee that the expected proportion of false discoveries (mistakes) is less than 5%. Explain how you proceed and how many genes you discover.
 
 In the nest question, we are tasked with finding the maximum number of genes such that the expected number of false discoveries is at most 5%. For this method, we use the Benjamini-Hochberg procedure \cite{FDR}. In short, it states that if we have a set of $\{ H_1, H_2, ... \: , H_m \}$ with associated and ordered p-values $\{ p_1, p_2, ... \: , p_m \}$, then the threshold for the index can be written as:
 
@@ -431,6 +437,8 @@ legend("topleft", legend = c("Benjamini-Hochberg boundary", "P-value", paste("In
 We can see that $\alpha \frac{i}{m}$ plots out a line, and we choose i such that $P_{(i)}$ always is smaller or equal to that value. Doing so, we get 941 discoveries such that the expected number of false discoveries is no more than 5 %
 
 ##2.5 Holm–Bonferroni method
+**Task description:** We wish to be more conservative and guarantee that the probability of making a false discovery (or more) is less than 5%. Explain how you proceed and how many genes you discover.
+
 
 A stronger guarantee would be that on impose that there shouldn't be more than a 5 % risk that any discovery is false. For this method, we use the Holm–Bonferroni method. The method is as follows:
 
