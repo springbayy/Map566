@@ -232,7 +232,11 @@ data.frame(power = c(power_wilcox), alpha = rep(seq_alpha, 1),
   ggplot() + aes(x = alpha, y = power, color = method) + geom_line()
 ```
 
-As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the null-hypothesis is rejected correctly only after 2 samples. However, this seems strange and thus one might want to adjust the $\alpha$ value to get a more reasonable sample requirement.
+As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the null-hypothesis is rejected correctly only after 2 samples.
+
+The conclusion is that th Wilcoxon test breaks down with so few samples. The Wolcoxon table, which is used to obtain the $\alpha$, does not go below a sample size of 5. And in the case that all the values of one distribution is larger, it gives at most an $\alpha$ of 0.1. \
+The other case would be to try and fit the data to a distribution. But with so few datapoints, that would be futile. \
+The answer to the question is therefore no, one can not make any conclusions.
 
 ### 1.4 Same proportion of male and female diabetics
 
@@ -288,7 +292,11 @@ As this test implicitly increases the p-value we of course cannot expect to reje
 load("liver_data.rda")
 ```
 
-### 2.1 We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot `cholesterol` as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and `cholesterol`?
+## 2.1 Finding most significant discovery
+
+**Task description:**: We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot cholesterol as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and cholesterol?
+
+We first want to study the gene which is the most correlated with the level of cholesterol. Identify this gene and plot `cholesterol` as a function of this gene expression level. Fit a linear model. Test if there is a significant relation between this gene expression and `cholesterol`?
 
 ```{r}
 labels <- colnames(liver)
@@ -339,9 +347,11 @@ ggplotRegression(min_p_model)
 
 ```
 
-### 2.2 We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains `cholesterol` as a function of the gene expression and compute the p-value of the test. AND
+## 2.2 Calculating all p-values
 
-### 2.3 Order the p-values and plot the ordered p-values as a function of their rank. On the same plot, display the line $y = x/3116$. Discuss the result.
+**Task description:**: We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains cholesterol as a function of the gene expression and compute the p-value of the test.
+
+We now do the same test for all 3116 genes and fit a linear model that explains `cholesterol` as a function of the gene expression. Doing so gives us a relatively large proportion of genes that correspond to a p-value of less than 0.05
 
 ```{r}
 labels <- colnames(liver)
@@ -358,6 +368,21 @@ for (i in 2:3117){
   lineList = c(lineList, (i-1)/3116)
 }
 
+```
+
+```{r}
+plot(hist(p_list, breaks=20, col = c("orange", rep("lightblue", 100))), main = "Density of p-values", xlab = "p-values")
+
+```
+
+## 2.3 Ordering p-values
+
+**Task description:**Order the p-values and plot the ordered as a function of their rank. On the same plot, display the line y=x/3116. Discuss the result.
+
+Plotting all values, we can conclude that there are amount of models that have a p-value below 0.05. It is tempting to make the conclusion that all these models are statistically significant since they all have a small p-value. However, in the event that the we only have random data, we still expect 5% of the models to appear significantly significant. In fact, if we were to only have random data, we expect a uniform distribution between 0 and 1 for the p-values. Visually, looking at the figure above, we can the p-values perform better that the uniform distribution and therefore appear to contain significant discoveries.
+
+```{r}
+
 p_list=sort(p_list)
 plot(p_list, col = "blue", lwd = 2, xlab = "Rank", ylab = "p-value")
 lines(lineList, col = "red", lwd = 2)
@@ -367,7 +392,7 @@ legend("topleft", legend = c("p-values", "Uniform line"), col = c("blue", "red")
 
 ```
 
-Plotting all values, we can conclude that there are amount of models that have a p-value below 0.05. It is tempting to make the conclusion that all these models are statistically significant since they all have a small p-value. However, in the event that the we only have random data, we still expect 5% of the models to appear significantly significant. In fact, if we were to only have random data, we expect a uniform distribution between 0 and 1 for the p-values. Visually, looking at the Figure above, we can the p-values perform better that the uniform distribution and therefore appear to contain significant findings.
+Shuffling all labels, we get an approximate uniform distribution of p-values which corresponds to the p-values following a straight line
 
 ```{r}
 labels <- colnames(liver)
@@ -392,13 +417,19 @@ lines(lineList_shuffeled, col = "red", lwd = 2)
 
 legend("topleft", legend = c("p-values when shuffeled labels", "Uniform line"), col = c("blue", "red"), lwd = 2)
 
+plot(hist(p_list_shuffeled, breaks=20, col = c("orange", rep("lightblue", 100))), main = "Density of p-values", xlab = "p-values")
+
 ```
+
+## 2.4 Benjamini-Hochberg procedure
+
+**Task description:**Identify a set of genes linked to the response (aka discoveries). We want to guarantee that the expected proportion of false discoveries (mistakes) is less than 5%. Explain how you proceed and how many genes you discover.
 
 In the nest question, we are tasked with finding the maximum number of genes such that the expected number of false discoveries is at most 5%. For this method, we use the Benjamini-Hochberg procedure \cite{FDR}. In short, it states that if we have a set of $\{ H_1, H_2, ... \: , H_m \}$ with associated and ordered p-values $\{ p_1, p_2, ... \: , p_m \}$, then the threshold for the index can be written as:
 
-##2.4
-
 $$ P_{BH}= max_i \left\{ P_{(i)} : P_{(i)} \leq \alpha \frac{i}{m}      \right\} $$
+
+
 
 ```{r}
 
@@ -418,7 +449,6 @@ for (i in 1:3116){
 
 }
 
-print(index)
 
 
 plot(p_list, col = "blue", lwd = 2, xlab = "Index", ylab = "p-value")
@@ -436,11 +466,19 @@ legend("topleft", legend = c("Benjamini-Hochberg boundary", "P-value", paste("In
 
 We can see that $\alpha \frac{i}{m}$ plots out a line, and we choose i such that $P_{(i)}$ always is smaller or equal to that value. Doing so, we get 941 discoveries such that the expected number of false discoveries is no more than 5 %
 
-##2.5 A stronger guarantee would be that on impose that there shouldn't be more than a 5 % risk that any discovery is false. For this method, we use the Holm–Bonferroni method. The method is as follows:\\
+##2.5 Holm–Bonferroni method **Task description:** We wish to be more conservative and guarantee that the probability of making a false discovery (or more) is less than 5%. Explain how you proceed and how many genes you discover.
 
-I have my ordered p-values, $\{ P_1, P_2, ... \: , P_m \}$, and want the FWER to be no higher than a level $\alpha$. Is $P_1 < \alpha/m$? so, reject $H_1$ and continue to the next step, otherwise EXIT. Is $P_2 < \alpha/(m-1)$? so, reject $H_2$ and continue to the next step, otherwise EXIT.
+A stronger guarantee would be that on impose that there shouldn't be more than a 5 % risk that any discovery is false. For this method, we use the Holm–Bonferroni method. The method is as follows:
 
-Continue this iterative process as long as $P_k < \frac{\alpha}{m+1-k}$. Using this process, we get the following result:
+I have my ordered p-values, $\{ P_1, P_2, ... \: , P_m \}$, and want the FWER to be no higher than a level $\alpha$.
+
+1.  Is $P_1 < \alpha/m$? Reject $H_1$ and continue to the next step, otherwise EXIT.
+
+2.  Is $P_2 < \alpha/(m-1)$? so, reject $H_2$ and continue to the next step, otherwise EXIT.
+
+3.  Continue this iterative process as long as $P_k < \frac{\alpha}{m+1-k}$.
+
+    Using this process, we get the following result:
 
 ```{r}
 
@@ -474,6 +512,7 @@ legend("bottomright", legend = c("Holm–Bonferroni", "P-value", paste("Intersec
 ```
 
 Using this process, we see that we get 223 discoveries. We also not that smallest p-value in that set is approximately equal to $1.7 \cdot 10^{-5}$.
+
 
 ## 3. Non parametric regression
 
