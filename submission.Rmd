@@ -11,7 +11,6 @@ library(tidyverse)
 library(MASS)
 library(mixtools)
 library(pwr)
-library(mclust)
 ```
 
 # Statistics in Action - Homework
@@ -234,8 +233,8 @@ data.frame(power = c(power_wilcox), alpha = rep(seq_alpha, 1),
 
 As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the null-hypothesis is rejected correctly only after 2 samples.
 
-The conclusion is that th Wilcoxon test breaks down with so few samples. The Wolcoxon table, which is used to obtain the $\alpha$, does not go below a sample size of 5. And in the case that all the values of one distribution is larger, it gives at most an $\alpha$ of 0.1. \
-The other case would be to try and fit the data to a distribution. But with so few datapoints, that would be futile. \
+The conclusion is that th Wilcoxon test breaks down with so few samples. The Wolcoxon table, which is used to obtain the $\alpha$, does not go below a sample size of 5. And in the case that all the values of one distribution is larger, it gives at most an $\alpha$ of 0.1.\
+The other case would be to try and fit the data to a distribution. But with so few datapoints, that would be futile.\
 The answer to the question is therefore no, one can not make any conclusions.
 
 ### 1.4 Same proportion of male and female diabetics
@@ -429,8 +428,6 @@ In the nest question, we are tasked with finding the maximum number of genes suc
 
 $$ P_{BH}= max_i \left\{ P_{(i)} : P_{(i)} \leq \alpha \frac{i}{m}      \right\} $$
 
-
-
 ```{r}
 
 soft_guarantee=c()
@@ -512,7 +509,6 @@ legend("bottomright", legend = c("Holm–Bonferroni", "P-value", paste("Intersec
 ```
 
 Using this process, we see that we get 223 discoveries. We also not that smallest p-value in that set is approximately equal to $1.7 \cdot 10^{-5}$.
-
 
 ## 3. Non parametric regression
 
