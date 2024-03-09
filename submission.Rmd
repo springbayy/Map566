@@ -232,7 +232,11 @@ data.frame(power = c(power_wilcox), alpha = rep(seq_alpha, 1),
   ggplot() + aes(x = alpha, y = power, color = method) + geom_line()
 ```
 
-As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the null-hypothesis is rejected correctly only after 2 samples. However, this seems strange and thus one might want to adjust the $\alpha$ value to get a more reasonable sample requirement.
+As observed earlier for a $\alpha=0.05$ we basically have guaranteed that the null-hypothesis is rejected correctly only after 2 samples.
+
+The conclusion is that th Wilcoxon test breaks down with so few samples. The Wolcoxon table, which is used to obtain the $\alpha$, does not go below a sample size of 5. And in the case that all the values of one distribution is larger, it gives at most an $\alpha$ of 0.1. \
+The other case would be to try and fit the data to a distribution. But with so few datapoints, that would be futile. \
+The answer to the question is therefore no, one can not make any conclusions.
 
 ### 1.4 Same proportion of male and female diabetics
 
@@ -321,6 +325,7 @@ ggplotRegression(min_p_model)
 ```
 
 ## 2.2 Calculating all p-values
+
 **Task description:**: We now wish to perform the previous test for all of the 3116 genes. For each of the genes, fit a linear model that explains cholesterol as a function of the gene expression and compute the p-value of the test.
 
 We now do the same test for all 3116 genes and fit a linear model that explains `cholesterol` as a function of the gene expression. Doing so gives us a relatively large proportion of genes that correspond to a p-value of less than 0.05
@@ -392,7 +397,9 @@ legend("topleft", legend = c("p-values when shuffeled labels", "Uniform line"), 
 plot(hist(p_list_shuffeled, breaks=20, col = c("orange", rep("lightblue", 100))), main = "Density of p-values", xlab = "p-values")
 
 ```
+
 ## 2.4 Benjamini-Hochberg procedure
+
 **Task description:**Identify a set of genes linked to the response (aka discoveries). We want to guarantee that the expected proportion of false discoveries (mistakes) is less than 5%. Explain how you proceed and how many genes you discover.
 
 In the nest question, we are tasked with finding the maximum number of genes such that the expected number of false discoveries is at most 5%. For this method, we use the Benjamini-Hochberg procedure \cite{FDR}. In short, it states that if we have a set of $\{ H_1, H_2, ... \: , H_m \}$ with associated and ordered p-values $\{ p_1, p_2, ... \: , p_m \}$, then the threshold for the index can be written as:
@@ -436,9 +443,7 @@ legend("topleft", legend = c("Benjamini-Hochberg boundary", "P-value", paste("In
 
 We can see that $\alpha \frac{i}{m}$ plots out a line, and we choose i such that $P_{(i)}$ always is smaller or equal to that value. Doing so, we get 941 discoveries such that the expected number of false discoveries is no more than 5 %
 
-##2.5 Holm–Bonferroni method
-**Task description:** We wish to be more conservative and guarantee that the probability of making a false discovery (or more) is less than 5%. Explain how you proceed and how many genes you discover.
-
+##2.5 Holm–Bonferroni method **Task description:** We wish to be more conservative and guarantee that the probability of making a false discovery (or more) is less than 5%. Explain how you proceed and how many genes you discover.
 
 A stronger guarantee would be that on impose that there shouldn't be more than a 5 % risk that any discovery is false. For this method, we use the Holm–Bonferroni method. The method is as follows:
 
