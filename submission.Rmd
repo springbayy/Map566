@@ -993,7 +993,7 @@ out_general_constrained <- mixture_gaussian1D(sp500_data$DailyReturn, theta0, M_
 b_5constrained <- bic_benchmark(y, out_general_constrained, 2 * 5 + 1) # Only one mu is optimised
 
 theta = student_t_params
-b_tdist = 3 * log(length(y)) + 2 * neglog_likelihood_student_t(c(theta$nu, theta$mu, theta$sigma), y)
+b_tdist = log(length(y)) + 2 * neglog_likelihood_student_t(c(theta$nu, theta$mu, theta$sigma), y)
 
 single_guass <- fitdistr(sp500_data$DailyReturn, "normal")
 b_single_gauss <- BIC(single_guass)
