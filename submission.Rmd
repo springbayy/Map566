@@ -512,6 +512,321 @@ Using this process, we see that we get 223 discoveries. We also not that smalles
 
 ## 3. Non parametric regression
 
+
+### 3.1 Data uploading and plotting
+
+**Task description:** Upload the dataset contained in the file data_exo3.csv and plot the data.
+
+The first task asks to read and save the dataset contained in data_exo3.csv.
+
+```{r}
+data = read.csv("data_exo3.csv", sep="t", dec=",", na="")
+```
+
+It's a two-dimensional dataset in two variables denoted as x and y. After this, we want to plot the data on the plane:
+
+```{r}
+plot <- ggplot(data, aes(x = x, y = y)) + 
+  geom_point() + 
+  labs(title = "Scatter plot of the data", x = "X", y = "Y")
+plot
+```
+
+It is evident from the data exploration that observations with lower values of x are situated towards the upper region of the graph, whereas conversely, as x increases, the data points tend to shift lower. In the middle range, there is a discernible transitional pattern. 
+
+### 3.2 Polynomial Regression Models
+
+**Task description:** Try several polynomial models for the data, select a model and comment the results.
+
+In this section, we embark on the exploration of polynomial regression models. Our objective is to discern and select an appropriate polynomial model that best encapsulates the relationship between the variables.
+
+We initiate by fitting polynomial models ranging from degree 1 to 5. This choice is motivated by the desire to strike a balance between model simplicity and the ability to flexibly adapt to nuanced patterns within the data.
+
+But first, let's split the data in training and test in order to evaluate the predictive performance of the model.
+
+
+```{r}
+n <- nrow(data)
+is_train <- sample(c(TRUE, FALSE), n, prob = c(0.8, 0.2), replace = TRUE)
+training <- filter(data,  is_train)
+test     <- filter(data, !is_train)
+```
+
+Starting with the simplest model, a linear regression (degree 1), we aim to assess how well a straight line aligns with the observed data points.
+
+```{r}
+library(ggfortify)
+```
+
+```{r}
+lm1 <- lm(y ~ x, data = training)
+summary(lm1)
+
+predictions  <- 
+  lm(y ~ x, data = training) %>% 
+  predict(test)
+
+pred <- predictions
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+
+plot <-
+  training %>% ggplot() +  aes(x = x, y = y) + 
+  geom_point(size = 2, colour="#993399") +  xlab("x") + ylab("y") +
+  geom_point(data = data.frame(test, testing = predictions),
+             mapping = aes(x = x, y = y), size = 2, shape = 3, colour="red")
+
+plot <- plot + 
+  geom_smooth(method = "lm", data=training, formula = y ~ x, se = FALSE, colour="#339900") 
+plot
+
+autoplot(lm1, which = 1:2) 
+```
+
+The model exhibits a commendable R-squared value of 0.79, signifying a strong fit, and the F-statistic indicates a highly significant overall model (p<0.001). The score on the test dataset is slightly lower.
+
+We can see by the diagnostic plots that the model seems to underestimate the data in some intervals and overestimate in others. The residuals are not identically distributed around 0, as they follow a trend, and the extreme value are not extreme value of a normal distribution. A good idea is considering a polynomial regression of degree 2.
+
+```{r}
+lm2 <- lm(y ~ poly(x, 2), data=training)
+summary(lm2)
+
+predictions  <- 
+  lm(y ~ poly(x, 2), data = training) %>% 
+  predict(test)
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+
+plot <- plot + 
+  geom_smooth(method = "lm", data=training, formula = y ~ poly(x, 2, raw = TRUE), se = FALSE, colour="#177711")
+plot
+
+autoplot(lm2, which = 1:2)
+```
+
+The 2nd degree polynomial model shows a great improvement as it explains 89 percent of the variability of the training data and scores 87 percent on the test data. The plot shows how the curve better estimate the data and the diagnostic plot shows how the residuals' trend is closer to the axis.
+
+```{r}
+lm3 <- lm(y ~ poly(x, 3), data=training)
+summary(lm3)
+
+predictions  <- 
+  lm(y ~ poly(x, 3), data = training) %>% 
+  predict(test)
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+
+plot <- plot + 
+  geom_smooth(method = "lm", data=training, formula = y ~ poly(x, 3, raw = TRUE), se = FALSE, colour="#705511")
+plot
+
+autoplot(lm3, which = 1:2)
+```
+
+The 3rd degree polynomial model slightly improves the performance both on the training and the test data. On the other hand, there's no confirm on the statistical significance of the 3rd degree component, due to the p-value of 0.16.By the diagnostic plots, we observe that the distribution of residuals is still unbalanced.
+
+```{r}
+lm4 <- lm(y ~ poly(x, 4), data=training)
+summary(lm4)
+
+predictions  <- 
+  lm(y ~ poly(x, 4), data = training) %>% 
+  predict(test)
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+
+plot <- plot + 
+  geom_smooth(method = "lm", data=training, formula = y ~ poly(x, 4, raw = TRUE), se = FALSE, colour="#723366")
+plot
+
+autoplot(lm4, which = 1:2)
+```
+
+The 4th degree polynomial model shows a much better performance, explaining 95 percent of the variability of the data. It also has a high predictive power with a 97.7 percent score on the test data. The Residual vs Fitted diagnostic plot shows that the trend is closer to zero in this case.
+
+```{r}
+lm5 <- lm(y ~ poly(x, 5), data=training)
+summary(lm5)
+
+predictions  <- 
+  lm(y ~ poly(x, 5), data = training) %>% 
+  predict(test)
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+
+plot <- plot + 
+  geom_smooth(method = "lm", data=training, formula = y ~ poly(x, 5, raw = TRUE), se = FALSE, colour="#720099")
+plot
+
+autoplot(lm5, which = 1:2)
+```
+
+Finally, the fifth grade polynomial model increases slightly the score on the training data from 96 to 97 percent, decreasing the predictive model performance. It can be a consequence of overfitting. The fifth grade component is not confirmed to be statistically significant due to the p-value of 0.22. Overall, it seems less accurate than the previous model.
+
+From the previous observations, we have little reasons to prefer the 4th grade polynomial model. Let's delve into statistical tests in order to quantitatively verify what we observed.
+
+```{r}
+anova(lm1,lm4)
+anova(lm1,lm5)
+anova(lm2,lm4)
+anova(lm3,lm4)
+anova(lm2,lm5)
+anova(lm3,lm5)
+```
+
+As we observed during the single models analysis, the 4th and 5th grade models are highly preferred to the lower grade ones.
+
+```{r}
+anova(lm4,lm5)
+```
+
+By comparing 4th and 5th grade polynomials, the test doesn't let us reject the hypothesis that the 4th grade polynomial is enough to explain the data (instead of using the 5th grade component). We can go on with the likelihood ratio test, since out five model are nested with each other.
+
+```{r}
+logLik(lm1)
+logLik(lm2)
+logLik(lm3)
+logLik(lm4)
+logLik(lm5)
+```
+
+The test prefer the 4th and 5th grade polynomials as well, and indicates a little preference for the 4th grade one. The difference is not big enough to conclude that the 4th grade model better describes the relations among the variables of the data set. We can pursue our investigation by using information criteria
+
+```{r}
+as.matrix(BIC(lm1, lm2, lm3, lm4, lm5))
+as.matrix(AIC(lm1, lm2, lm3, lm4, lm5))
+```
+
+The BIC test leans marginally towards favoring the 4th-grade model, whereas the AIC test yields nearly equivalent values for the 4th and 5th-grade polynomial models.
+
+Considering the inclinations of the AIC and likelihood ratio tests, coupled with the superior prediction score on the test data and the lack of confirmed statistical significance in the 5th-grade component, we adhere to the 4th-grade polynomial regression model as the most suitable polynomial model.
+
+### 3.3 Nonlinear Regression Model and Comparison
+
+**Task description:** Fit a nonlinear model and compare with the polynomial model you have selected.
+
+Given the discernible shape of the data from the plot, a viable approach involves attempting to model the data using the following function:
+y ~ B + A / ( 1 + exp(- gamma * (x -tau)))
+This function incorporates four parameters: A, B, gamma and tau, which are subject to estimation.
+
+```{r}
+library(minpack.lm)
+nlm1 <- nlsLM(y ~  B + A / ( 1 + exp(- gamma * (x -tau))), data = training, start = c(A=0, gamma=0, tau=2, B=2))
+summary(nlm1)
+
+predictions <- predict(nlm1, newdata = test)
+
+R2_test <- cor(predictions, test$y)^2
+print("R2 test: ")
+R2_test
+```
+
+This nonlinear model contains a better description of the data and a quasi-perfect prediction performance with a 99.5 percent score.
+
+```{r}
+new_data <- data.frame(x = seq(min(data$x), max(data$x), length.out = 100))
+
+predictions <- predict(nlm1, newdata = new_data)
+
+library(ggplot2)
+
+plot <-
+  training %>% ggplot() +  aes(x = x, y = y) + 
+  geom_point(size = 2, colour="#993399") +  xlab("x") + ylab("y") +
+  geom_point(data = data.frame(test, testing = pred),
+             mapping = aes(x = x, y = y), size = 2, shape = 3, colour="red")
+
+plot2 <- plot +
+  geom_line(data = new_data, aes(x = x, y = predictions), color = "blue") +
+  labs(title = "Fit del Modello nls", x = "X", y = "Y")
+
+plot2
+
+plot2 +
+  geom_smooth(data = data, 
+    mapping = aes(x = x, y = y),
+    method = "lm", formula = y ~ poly(x, 4, raw = TRUE), se = FALSE, color = "red")
+```
+
+By visual examination, it's evident that the nonlinear model better describes and estimates the data within the range x=3 to x=6. It is anticipated that subsequent statistical tests will quantitatively affirm the preference for the nonlinear model when compared to the polynomial counterpart.
+
+```{r}
+logLik(lm4)
+logLik(nlm1)
+```
+
+The likelihood ratio test unequivocally supports the superiority of the nonlinear model, showcasing a substantial advantage over its counterpart.
+
+```{r}
+as.matrix(BIC(lm4, nlm1))
+as.matrix(AIC(lm4, nlm1))
+```
+
+The outcome is affine when evaluating and comparing using information criteria. We have enough evidence to conclude that the preferred model for the description of the dataset is the nonlinear one.
+
+### 3.4 Confidence Intervals and Prediction Intervals
+
+**Task description:** Calculate confidence intervals for E(y_new) and prediction intervals for Y_new on the following values of the covariate: x_new = (1,...,10)
+
+In the context of obtaining prediction intervals and confidence intervals, we employ the delta-method.
+
+```{r}
+# Calculate the derivative
+f_prime <- deriv(y ~  B + A / ( 1 + exp(- gamma * (x -tau))), c("A", "gamma", "tau", "B"), function(A, gamma, tau, B, x){} ) 
+
+# Generate x_new
+x_new <- seq(1, 10, by=1)
+
+# Obtain the coefficients from the nonlinear model
+beta_hat <- coef(nlm1)
+
+# Calculate the new function values and gradient
+f_new    <- f_prime(beta_hat[1], beta_hat[2], beta_hat[3], beta_hat[4], x_new)
+grad_new <- attr(f_new, "gradient")
+GS <- rowSums((grad_new %*% vcov(nlm1)) * grad_new)
+
+# Set the confidence level
+alpha <- 0.05
+
+# Calculate the confidence intervals and create a data frame
+delta_f <- sqrt(GS) * qt(1-alpha/2,  n - length(beta_hat))
+df_delta <- data.frame(
+  x = x_new, 
+  f = f_new, 
+  lwr_conf = f_new - delta_f, 
+  upr_conf = f_new + delta_f
+  )
+
+# Calculate prediction intervals and add to the data frame
+delta_y    <- sqrt(GS + sigma(nlm1)^2)*qt(1-alpha/2,  n - length(beta_hat))
+df_delta[c("lwr_pred","upr_pred")] <- cbind(f_new - delta_y,f_new + delta_y)
+
+# Display the resulting data frame
+df_delta
+
+# Plot the results
+ggplot(df_delta, aes(x = x, y = f)) +
+  geom_point() +
+  geom_ribbon(aes(ymin = lwr_conf, ymax = upr_conf), fill = "blue", alpha = 0.2, color = NA, linetype = 0) +
+  geom_ribbon(aes(ymin = lwr_pred, ymax = upr_pred), fill = "red", alpha = 0.2, color = NA, linetype = 0) +
+  labs(title = "Confidence Intervals and Prediction Intervals",
+       x = "x_new",
+       y = "y_new") +
+  theme_minimal()
+```
+
+In this visualization, the model's predictions are denoted by black points, accompanied by the respective prediction interval and confidence interval. These intervals have been computed for each value of x_new and connected to form two continuous bands encapsulating the forecasted outcomes.
+
 ## 4. S&P500 daily return
 
 ### 4.1 Data loading and computing daily return
